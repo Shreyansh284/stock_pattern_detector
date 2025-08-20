@@ -2,8 +2,12 @@ import os
 import pandas as pd
 import numpy as np
 import yfinance as yf
+import matplotlib
+# Use a non-interactive backend to avoid Tkinter issues when running headless
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+import time
 
 def load_data(symbol, start_date, end_date):
     data = yf.download(symbol, start=start_date, end=end_date)
@@ -193,47 +197,71 @@ def plot_pattern_zoom(df, pattern, stock_name, output_path):
     df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
     if df_zoom.empty: return
 
-    plt.figure(figsize=(12, 7))
-    plt.plot(df_zoom['Date'], df_zoom['Close'], label='Close Price', color='navy')
+    # Create two stacked axes: price (top) and volume (bottom) sharing the x-axis
+    fig, (ax_price, ax_vol) = plt.subplots(2, 1, sharex=True, figsize=(12, 8),
+                                          gridspec_kw={'height_ratios': [3, 1]})
+
+    # Price line
+    ax_price.plot(df_zoom['Date'], df_zoom['Close'], label='Close Price', color='navy')
 
     # Mark pattern points
     points_dates = [p1_date, p2_date, p3_date]
     points_prices = [p1_high, p2_high, p3_high]
-    plt.scatter(points_dates, points_prices, color=['orange', 'red', 'orange'], s=120, zorder=5, label='Shoulders & Head')
+    ax_price.scatter(points_dates, points_prices, color=['orange', 'red', 'orange'], s=120, zorder=5, label='Shoulders & Head')
     
     troughs_dates = [t1_date, t2_date]
     troughs_prices = [t1_low, t2_low]
-    plt.scatter(troughs_dates, troughs_prices, color='blue', s=100, zorder=5, label='Troughs')
+    ax_price.scatter(troughs_dates, troughs_prices, color='blue', s=100, zorder=5, label='Troughs')
 
     # Draw Neckline
     slope = pattern['neckline_slope']
     intercept = pattern['neckline_intercept']
     neckline_x = [df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]]
     neckline_y = [slope * d.toordinal() + intercept for d in neckline_x]
-    plt.plot(neckline_x, neckline_y, 'g--', label='Neckline')
+    ax_price.plot(neckline_x, neckline_y, 'g--', label='Neckline')
 
-    # Mark Breakout
+    # Mark Breakout on price
     breakout_date = df['Date'][breakout_idx]
     breakout_price = df['Close'][breakout_idx]
-    plt.scatter(breakout_date, breakout_price, color='purple', s=150, zorder=6, marker='*', label='Breakout')
+    ax_price.scatter(breakout_date, breakout_price, color='purple', s=150, zorder=6, marker='*', label='Breakout')
 
-    plt.xlim(df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1])
-    plt.ylim(df_zoom['Low'].min() * 0.98, df_zoom['High'].max() * 1.02)
-    plt.title(f"{stock_name} - Confirmed Head and Shoulders Pattern")
-    plt.xlabel('Date')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
+    # Volume bars on bottom axis
+    if 'Volume' in df_zoom.columns:
+        ax_vol.bar(df_zoom['Date'], df_zoom['Volume'], color='gray', alpha=0.6)
+        # Highlight breakout volume bar
+        try:
+            ax_vol.bar(breakout_date, df.loc[breakout_idx, 'Volume'], color='purple', alpha=0.9)
+        except Exception:
+            pass
+
+    # Formatting
+    ax_price.set_xlim(df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1])
+    ax_price.set_ylim(df_zoom['Low'].min() * 0.98, df_zoom['High'].max() * 1.02)
+    ax_price.set_title(f"{stock_name} - Confirmed Head and Shoulders Pattern")
+    ax_price.set_ylabel('Price')
+    ax_vol.set_ylabel('Volume')
+    ax_vol.set_xlabel('Date')
+
+    ax_price.legend(loc='upper left')
+    ax_price.grid(True, linestyle='--', alpha=0.6)
+    ax_vol.grid(False)
     plt.tight_layout()
     plt.savefig(output_path)
-    plt.close()
+    plt.close(fig)
 
 if __name__ == "__main__":
-    symbol = 'RELIANCE.NS'
+    # List of ~25 popular NSE tickers to analyze (add or remove as needed)
+    symbols = [
+        'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS',
+        'LT.NS', 'AXISBANK.NS', 'KOTAKBANK.NS', 'SBIN.NS', 'HINDUNILVR.NS',
+        'ITC.NS', 'MARUTI.NS', 'BHARTIARTL.NS', 'ASIANPAINT.NS', 'BAJFINANCE.NS',
+        'HCLTECH.NS', 'WIPRO.NS', 'ONGC.NS', 'BPCL.NS', 'TATAMOTORS.NS',
+        'TATASTEEL.NS', 'JSWSTEEL.NS', 'SUNPHARMA.NS', 'LTIM.NS', 'NESTLEIND.NS'
+    ]
+
     start_date = '2015-01-01'
-    end_date = '2025-08-20'
-    df = load_data(symbol, start_date, end_date)
-    df = find_swing_points(df, N_bars=20)
+    end_date = datetime.now().strftime('%Y-%m-%d')
+
     # Run detection for multiple time windows and save results separately
     windows = {
         '1y': 365,
@@ -242,26 +270,51 @@ if __name__ == "__main__":
         '5y': 365*5,
     }
 
-    out_base = os.path.join(os.getcwd(), 'PatternCharts', symbol)
-    os.makedirs(out_base, exist_ok=True)
-
-    for name, days in windows.items():
-        df_slice = df[df['Date'] >= df['Date'].max() - pd.Timedelta(days=days)].copy()
-        if df_slice.empty:
-            print(f"No data for window {name}")
+    for symbol in symbols:
+        print(f"\nProcessing {symbol}...")
+        try:
+            df = load_data(symbol, start_date, end_date)
+        except Exception as e:
+            print(f"Failed to download {symbol}: {e}")
+            # short sleep to avoid hammering the API on repeated failures
+            time.sleep(1)
             continue
 
-        # Reset index and recompute swing points on the slice so indices are positional (0..n-1)
-        df_slice = df_slice.reset_index(drop=True)
-        df_slice = find_swing_points(df_slice, N_bars=20)
+        if df is None or df.empty:
+            print(f"No data for {symbol}, skipping.")
+            time.sleep(0.5)
+            continue
 
-        patterns = detect_head_and_shoulders(df_slice)
-        folder = os.path.join(out_base, name)
-        os.makedirs(folder, exist_ok=True)
-        if patterns:
-            print(f"{name}: {len(patterns)} confirmed pattern(s) detected")
-            for idx, pattern in enumerate(patterns, 1):
-                out_path = os.path.join(folder, f'{symbol}_pattern_zoom_{name}_{idx}.png')
-                plot_pattern_zoom(df_slice, pattern, symbol, out_path)
-        else:
-            print(f"{name}: No confirmed head and shoulders pattern detected.")
+        # Compute swing points once for full history (used to slice windows)
+        df = df.reset_index(drop=True)
+        df = find_swing_points(df, N_bars=20)
+
+        out_base = os.path.join(os.getcwd(), 'PatternCharts', symbol)
+        os.makedirs(out_base, exist_ok=True)
+
+        for name, days in windows.items():
+            df_slice = df[df['Date'] >= df['Date'].max() - pd.Timedelta(days=days)].copy()
+            if df_slice.empty:
+                print(f"{symbol} - {name}: No data for window {name}")
+                continue
+
+            # Reset index and recompute swing points on the slice so indices are positional (0..n-1)
+            df_slice = df_slice.reset_index(drop=True)
+            df_slice = find_swing_points(df_slice, N_bars=20)
+
+            patterns = detect_head_and_shoulders(df_slice)
+            folder = os.path.join(out_base, name)
+            os.makedirs(folder, exist_ok=True)
+            if patterns:
+                print(f"{symbol} - {name}: {len(patterns)} confirmed pattern(s) detected")
+                for idx, pattern in enumerate(patterns, 1):
+                    out_path = os.path.join(folder, f'{symbol}_pattern_zoom_{name}_{idx}.png')
+                    try:
+                        plot_pattern_zoom(df_slice, pattern, symbol, out_path)
+                    except Exception as e:
+                        print(f"Failed to plot pattern for {symbol} {name} #{idx}: {e}")
+            else:
+                print(f"{symbol} - {name}: No confirmed head and shoulders pattern detected.")
+
+        # Be polite to the API
+        time.sleep(1)

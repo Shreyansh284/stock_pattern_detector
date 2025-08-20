@@ -1,0 +1,17 @@
+# Ignore generated pattern chart images
+PatternCharts/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+env/
+venv/
+
+# VS Code settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
