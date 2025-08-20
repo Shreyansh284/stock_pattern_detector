@@ -1,0 +1,1 @@
+# head_and_shoulder_pattern_detector
