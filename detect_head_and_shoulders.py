@@ -270,6 +270,8 @@ if __name__ == "__main__":
         '5y': 365*5,
     }
 
+    summary_records = []
+
     for symbol in symbols:
         print(f"\nProcessing {symbol}...")
         try:
@@ -313,8 +315,52 @@ if __name__ == "__main__":
                         plot_pattern_zoom(df_slice, pattern, symbol, out_path)
                     except Exception as e:
                         print(f"Failed to plot pattern for {symbol} {name} #{idx}: {e}")
+                    # Record summary info for CSV
+                    try:
+                        p1_date, p1_high = pattern['P1']
+                        t1_date, t1_low = pattern['T1']
+                        p2_date, p2_high = pattern['P2']
+                        t2_date, t2_low = pattern['T2']
+                        p3_date, p3_high = pattern['P3']
+                        breakout_idx = pattern.get('breakout_idx', -1)
+                        breakout_date = df_slice['Date'].iloc[breakout_idx] if breakout_idx >= 0 and breakout_idx < len(df_slice) else None
+                    except Exception:
+                        # Fallback: skip recording malformed pattern
+                        breakout_date = None
+                        p1_date = p2_date = p3_date = None
+                        p1_high = p2_high = p3_high = None
+                        t1_date = t2_date = None
+                        t1_low = t2_low = None
+                    summary_records.append({
+                        'symbol': symbol,
+                        'window': name,
+                        'P1_date': pd.to_datetime(p1_date).strftime('%Y-%m-%d') if p1_date is not None else None,
+                        'P1_high': p1_high,
+                        'T1_date': pd.to_datetime(t1_date).strftime('%Y-%m-%d') if t1_date is not None else None,
+                        'T1_low': t1_low,
+                        'P2_date': pd.to_datetime(p2_date).strftime('%Y-%m-%d') if p2_date is not None else None,
+                        'P2_high': p2_high,
+                        'T2_date': pd.to_datetime(t2_date).strftime('%Y-%m-%d') if t2_date is not None else None,
+                        'T2_low': t2_low,
+                        'P3_date': pd.to_datetime(p3_date).strftime('%Y-%m-%d') if p3_date is not None else None,
+                        'P3_high': p3_high,
+                        'breakout_date': pd.to_datetime(breakout_date).strftime('%Y-%m-%d') if breakout_date is not None else None,
+                        'image_path': out_path
+                    })
             else:
                 print(f"{symbol} - {name}: No confirmed head and shoulders pattern detected.")
 
         # Be polite to the API
         time.sleep(1)
+
+    # Save CSV summary of all detected patterns
+    if summary_records:
+        summary_df = pd.DataFrame(summary_records)
+        csv_path = os.path.join(os.getcwd(), 'pattern_detection_summary.csv')
+        try:
+            summary_df.to_csv(csv_path, index=False)
+            print(f"\nSaved summary CSV to {csv_path}")
+        except Exception as e:
+            print(f"Failed to write summary CSV: {e}")
+    else:
+        print("\nNo patterns detected across all symbols; no summary CSV created.")
