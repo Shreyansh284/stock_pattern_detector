@@ -72,7 +72,7 @@ def check_preceding_uptrend(data, pattern_start_index, lookback_period=90, min_r
 
     return end_price > start_price * (1 + min_rise_percent)
 
-def detect_head_and_shoulders(data):
+def detect_head_and_shoulders(data, min_days=None, max_days=None):
     swing_points_df = data[data['is_swing_high'] | data['is_swing_low']].reset_index()
     patterns = []
 
@@ -93,7 +93,7 @@ def detect_head_and_shoulders(data):
         t2_low, t2_date = data.loc[t2_idx, ['Low', 'Date']]
         p3_high, p3_date = data.loc[p3_idx, ['High', 'Date']]
 
-        # --- Rule 1: Preceding Uptrend ---
+    # --- Rule 1: Preceding Uptrend ---
         if not check_preceding_uptrend(data, p1_idx):
             continue
 
@@ -103,6 +103,17 @@ def detect_head_and_shoulders(data):
 
         # --- Rule 3: Shoulders Proportionality ---
         if abs(p1_high - p3_high) / max(p1_high, p3_high) > 0.15: # Shoulders within 15% height
+            continue
+
+        # --- Duration filter (optional) ---
+        try:
+            duration_days = (p3_date - p1_date).days
+        except Exception:
+            # If dates are malformed, skip
+            continue
+        if min_days is not None and duration_days < min_days:
+            continue
+        if max_days is not None and duration_days > max_days:
             continue
 
         # --- Rule 4: Neckline Calculation ---
@@ -223,10 +234,34 @@ if __name__ == "__main__":
     end_date = '2025-08-20'
     df = load_data(symbol, start_date, end_date)
     df = find_swing_points(df, N_bars=20)
-    patterns = detect_head_and_shoulders(df)
-    if patterns:
-        print(f"{len(patterns)} confirmed pattern(s) detected!")
-        for idx, pattern in enumerate(patterns, 1):
-            plot_pattern_zoom(df, pattern, symbol, f'{symbol}_pattern_zoom_{idx}.png')
-    else:
-        print("No confirmed head and shoulders pattern detected.")
+    # Run detection for multiple time windows and save results separately
+    windows = {
+        '1y': 365,
+        '2y': 365*2,
+        '3y': 365*3,
+        '5y': 365*5,
+    }
+
+    out_base = os.path.join(os.getcwd(), 'PatternCharts', symbol)
+    os.makedirs(out_base, exist_ok=True)
+
+    for name, days in windows.items():
+        df_slice = df[df['Date'] >= df['Date'].max() - pd.Timedelta(days=days)].copy()
+        if df_slice.empty:
+            print(f"No data for window {name}")
+            continue
+
+        # Reset index and recompute swing points on the slice so indices are positional (0..n-1)
+        df_slice = df_slice.reset_index(drop=True)
+        df_slice = find_swing_points(df_slice, N_bars=20)
+
+        patterns = detect_head_and_shoulders(df_slice)
+        folder = os.path.join(out_base, name)
+        os.makedirs(folder, exist_ok=True)
+        if patterns:
+            print(f"{name}: {len(patterns)} confirmed pattern(s) detected")
+            for idx, pattern in enumerate(patterns, 1):
+                out_path = os.path.join(folder, f'{symbol}_pattern_zoom_{name}_{idx}.png')
+                plot_pattern_zoom(df_slice, pattern, symbol, out_path)
+        else:
+            print(f"{name}: No confirmed head and shoulders pattern detected.")
