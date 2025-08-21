@@ -624,8 +624,11 @@ def plot_double_zoom(df, pattern, stock_name, output_path):
 
 if __name__ == "__main__":
     # parse command line mode: strict (default), lenient (legacy), or both
-    parser = argparse.ArgumentParser(description='Head and Shoulders detector')
+
+    parser = argparse.ArgumentParser(description='Pattern detector')
     parser.add_argument('--mode', choices=['strict', 'lenient', 'both'], default='strict', help='detection mode')
+    parser.add_argument('--pattern', choices=['all', 'head_and_shoulders', 'double_top', 'double_bottom'], default='all',
+                        help='Pattern(s) to check: all, head_and_shoulders, double_top, double_bottom')
     args = parser.parse_args()
 
     def apply_mode_settings(mode):
@@ -652,13 +655,17 @@ if __name__ == "__main__":
     else:
         modes_to_run = [args.mode]
 
-    # List of ~25 popular NSE tickers to analyze (add or remove as needed)
+    # List of US tech stocks, requested tickers, and popular Indian stocks
     symbols = [
-        'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS',
-        'LT.NS', 'AXISBANK.NS', 'KOTAKBANK.NS', 'SBIN.NS', 'HINDUNILVR.NS',
-        'ITC.NS', 'MARUTI.NS', 'BHARTIARTL.NS', 'ASIANPAINT.NS', 'BAJFINANCE.NS',
-        'HCLTECH.NS', 'WIPRO.NS', 'ONGC.NS', 'BPCL.NS', 'TATAMOTORS.NS',
-        'TATASTEEL.NS', 'JSWSTEEL.NS', 'SUNPHARMA.NS', 'LTIM.NS', 'NESTLEIND.NS'
+        'GOOG', 'GOOGL', 'AMZN', 'TSLA', 'MANT', 'NVDA', 'MBOT', 'AAPL',
+        '360ONE.NS', '5PAISA.NS', 'AAIL.NS', 'ABB.NS', 'ADANIGREEN.NS', 'ADANIPOWER.NS',
+        'AETHER.NS', 'SBIN.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'BANKBARODA.NS',
+        'ASHOKLEY.NS', 'SUZLON.NS', 'JYOTICNC.NS',
+        # More well-known Indian stocks
+        'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'LT.NS', 'AXISBANK.NS', 'KOTAKBANK.NS',
+        'HINDUNILVR.NS', 'ITC.NS', 'MARUTI.NS', 'BHARTIARTL.NS', 'ASIANPAINT.NS',
+        'BAJFINANCE.NS', 'HCLTECH.NS', 'WIPRO.NS', 'ONGC.NS', 'BPCL.NS',
+        'TATAMOTORS.NS', 'TATASTEEL.NS', 'JSWSTEEL.NS', 'SUNPHARMA.NS', 'LTIM.NS', 'NESTLEIND.NS'
     ]
 
     start_date = '2015-01-01'
@@ -696,8 +703,8 @@ if __name__ == "__main__":
             df = df.reset_index(drop=True)
             df = find_swing_points(df, N_bars=20)
 
+
             out_base = os.path.join(os.getcwd(), 'PatternCharts', symbol)
-            os.makedirs(out_base, exist_ok=True)
 
             for name, days in windows.items():
                 df_slice = df[df['Date'] >= df['Date'].max() - pd.Timedelta(days=days)].copy()
@@ -715,21 +722,20 @@ if __name__ == "__main__":
                 else:
                     df_slice = generate_swing_flags(df_slice, method='rolling', N_bars=nbars_slice)
 
-                patterns = detect_head_and_shoulders(df_slice)
-                # detect double tops / bottoms
-                double_patterns = detect_double_tops_and_bottoms(df_slice)
-                # prepare output folders for this symbol/window
-                base_folder = os.path.join(out_base, name)
-                os.makedirs(base_folder, exist_ok=True)
-                hns_folder = os.path.join(base_folder, 'HNS')
-                dt_folder = os.path.join(base_folder, 'DT')
-                db_folder = os.path.join(base_folder, 'DB')
-                os.makedirs(hns_folder, exist_ok=True)
-                os.makedirs(dt_folder, exist_ok=True)
-                os.makedirs(db_folder, exist_ok=True)
 
-                # Handle Head & Shoulders patterns
-                if patterns:
+                # Pattern selection logic
+                run_hns = args.pattern in ('all', 'head_and_shoulders')
+                run_dt = args.pattern in ('all', 'double_top')
+                run_db = args.pattern in ('all', 'double_bottom')
+
+                patterns = detect_head_and_shoulders(df_slice) if run_hns else []
+                double_patterns = detect_double_tops_and_bottoms(df_slice) if (run_dt or run_db) else []
+
+                # Only create folders if patterns are detected
+                if run_hns and patterns:
+                    base_folder = os.path.join(out_base, name)
+                    hns_folder = os.path.join(base_folder, 'HNS')
+                    os.makedirs(hns_folder, exist_ok=True)
                     print(f"{symbol} - {name}: {len(patterns)} confirmed pattern(s) detected")
                     for idx, pattern in enumerate(patterns, 1):
                         out_path = os.path.join(hns_folder, f'{symbol}_HNS_pattern_zoom_{name}_{idx}.png')
@@ -747,7 +753,6 @@ if __name__ == "__main__":
                             breakout_idx = pattern.get('breakout_idx', -1)
                             breakout_date = df_slice['Date'].iloc[breakout_idx] if breakout_idx >= 0 and breakout_idx < len(df_slice) else None
                         except Exception:
-                            # Fallback: skip recording malformed pattern
                             breakout_date = None
                             p1_date = p2_date = p3_date = None
                             p1_high = p2_high = p3_high = None
@@ -770,45 +775,92 @@ if __name__ == "__main__":
                             'breakout_date': pd.to_datetime(breakout_date).strftime('%Y-%m-%d') if breakout_date is not None else None,
                             'image_path': out_path
                         })
-                else:
+                elif run_hns:
                     print(f"{symbol} - {name}: No confirmed head and shoulders pattern detected.")
 
                 # handle double patterns
                 if double_patterns:
-                    print(f"{symbol} - {name}: {len(double_patterns)} double pattern(s) detected")
-                    for d_idx, dpat in enumerate(double_patterns, 1):
-                        if dpat.get('type') == 'double_top':
+                    # Filter double patterns by type if needed
+                    dt_patterns = [d for d in double_patterns if d.get('type') == 'double_top'] if run_dt else []
+                    db_patterns = [d for d in double_patterns if d.get('type') == 'double_bottom'] if run_db else []
+
+                    # Double Top
+                    if run_dt and dt_patterns:
+                        base_folder = os.path.join(out_base, name)
+                        dt_folder = os.path.join(base_folder, 'DT')
+                        os.makedirs(dt_folder, exist_ok=True)
+                        print(f"{symbol} - {name}: {len(dt_patterns)} double top pattern(s) detected")
+                        for d_idx, dpat in enumerate(dt_patterns, 1):
                             out_path = os.path.join(dt_folder, f'{symbol}_DT_pattern_{name}_{d_idx}.png')
-                        else:
+                            try:
+                                plot_double_zoom(df_slice, dpat, symbol, out_path)
+                            except Exception as e:
+                                print(f"Failed to plot double pattern for {symbol} {name} #{d_idx}: {e}")
+                            # record
+                            try:
+                                p1_date, p1_price = dpat['P1']
+                                t_date, t_price = dpat['T']
+                                p2_date, p2_price = dpat['P2']
+                                breakout_idx = dpat.get('breakout_idx', -1)
+                                breakout_date = df_slice['Date'].iloc[breakout_idx] if breakout_idx >= 0 and breakout_idx < len(df_slice) else None
+                            except Exception:
+                                breakout_date = None
+                                p1_date = p2_date = t_date = None
+                                p1_price = p2_price = t_price = None
+                            summary_records.append({
+                                'pattern_type': dpat.get('type', 'double'),
+                                'symbol': symbol,
+                                'window': name,
+                                'P1_date': pd.to_datetime(p1_date).strftime('%Y-%m-%d') if p1_date is not None else None,
+                                'P1_price': p1_price,
+                                'T_date': pd.to_datetime(t_date).strftime('%Y-%m-%d') if t_date is not None else None,
+                                'T_price': t_price,
+                                'P2_date': pd.to_datetime(p2_date).strftime('%Y-%m-%d') if p2_date is not None else None,
+                                'P2_price': p2_price,
+                                'breakout_date': pd.to_datetime(breakout_date).strftime('%Y-%m-%d') if breakout_date is not None else None,
+                                'image_path': out_path
+                            })
+                    elif run_dt:
+                        print(f"{symbol} - {name}: No double top pattern detected.")
+
+                    # Double Bottom
+                    if run_db and db_patterns:
+                        base_folder = os.path.join(out_base, name)
+                        db_folder = os.path.join(base_folder, 'DB')
+                        os.makedirs(db_folder, exist_ok=True)
+                        print(f"{symbol} - {name}: {len(db_patterns)} double bottom pattern(s) detected")
+                        for d_idx, dpat in enumerate(db_patterns, 1):
                             out_path = os.path.join(db_folder, f'{symbol}_DB_pattern_{name}_{d_idx}.png')
-                        try:
-                            plot_double_zoom(df_slice, dpat, symbol, out_path)
-                        except Exception as e:
-                            print(f"Failed to plot double pattern for {symbol} {name} #{d_idx}: {e}")
-                        # record
-                        try:
-                            p1_date, p1_price = dpat['P1']
-                            t_date, t_price = dpat['T']
-                            p2_date, p2_price = dpat['P2']
-                            breakout_idx = dpat.get('breakout_idx', -1)
-                            breakout_date = df_slice['Date'].iloc[breakout_idx] if breakout_idx >= 0 and breakout_idx < len(df_slice) else None
-                        except Exception:
-                            breakout_date = None
-                            p1_date = p2_date = t_date = None
-                            p1_price = p2_price = t_price = None
-                        summary_records.append({
-                            'pattern_type': dpat.get('type', 'double'),
-                            'symbol': symbol,
-                            'window': name,
-                            'P1_date': pd.to_datetime(p1_date).strftime('%Y-%m-%d') if p1_date is not None else None,
-                            'P1_price': p1_price,
-                            'T_date': pd.to_datetime(t_date).strftime('%Y-%m-%d') if t_date is not None else None,
-                            'T_price': t_price,
-                            'P2_date': pd.to_datetime(p2_date).strftime('%Y-%m-%d') if p2_date is not None else None,
-                            'P2_price': p2_price,
-                            'breakout_date': pd.to_datetime(breakout_date).strftime('%Y-%m-%d') if breakout_date is not None else None,
-                            'image_path': out_path
-                        })
+                            try:
+                                plot_double_zoom(df_slice, dpat, symbol, out_path)
+                            except Exception as e:
+                                print(f"Failed to plot double pattern for {symbol} {name} #{d_idx}: {e}")
+                            # record
+                            try:
+                                p1_date, p1_price = dpat['P1']
+                                t_date, t_price = dpat['T']
+                                p2_date, p2_price = dpat['P2']
+                                breakout_idx = dpat.get('breakout_idx', -1)
+                                breakout_date = df_slice['Date'].iloc[breakout_idx] if breakout_idx >= 0 and breakout_idx < len(df_slice) else None
+                            except Exception:
+                                breakout_date = None
+                                p1_date = p2_date = t_date = None
+                                p1_price = p2_price = t_price = None
+                            summary_records.append({
+                                'pattern_type': dpat.get('type', 'double'),
+                                'symbol': symbol,
+                                'window': name,
+                                'P1_date': pd.to_datetime(p1_date).strftime('%Y-%m-%d') if p1_date is not None else None,
+                                'P1_price': p1_price,
+                                'T_date': pd.to_datetime(t_date).strftime('%Y-%m-%d') if t_date is not None else None,
+                                'T_price': t_price,
+                                'P2_date': pd.to_datetime(p2_date).strftime('%Y-%m-%d') if p2_date is not None else None,
+                                'P2_price': p2_price,
+                                'breakout_date': pd.to_datetime(breakout_date).strftime('%Y-%m-%d') if breakout_date is not None else None,
+                                'image_path': out_path
+                            })
+                    elif run_db:
+                        print(f"{symbol} - {name}: No double bottom pattern detected.")
 
         # Be polite to the API
         time.sleep(1)
