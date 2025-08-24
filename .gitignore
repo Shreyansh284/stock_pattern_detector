@@ -1,5 +1,6 @@
 # Ignore generated pattern chart images
 PatternCharts/
+outputs/
 pattern_detection_summary.csv
 # Byte-compiled / cache
 __pycache__/

@@ -465,20 +465,25 @@ def detect_cup_and_handle(data, config, require_preceding_trend=True):
             if cup_depth < config['CUP_DEPTH_MIN'] or cup_depth > config['CUP_DEPTH_MAX']:
                 continue
 
-            # Cup symmetry check
+
+            # Cup symmetry check (enforce U-shape, not V)
             left_side_duration = (cup_bottom_date - left_rim_date).days
             right_side_duration = (right_rim_date - cup_bottom_date).days
+            total_cup_duration = (right_rim_date - left_rim_date).days
             if left_side_duration == 0 or right_side_duration == 0:
                 continue
-
             symmetry_ratio = min(left_side_duration, right_side_duration) / max(left_side_duration, right_side_duration)
             if symmetry_ratio < (1 - config['CUP_SYMMETRY_TOL']):
+                continue
+            # Enforce U-shape: both sides must be at least 30% of total cup duration (no sharp V)
+            if left_side_duration < 0.3 * total_cup_duration or right_side_duration < 0.3 * total_cup_duration:
                 continue
 
             # Rim height similarity
             rim_difference = abs(left_rim_high - right_rim_high) / max(left_rim_high, right_rim_high)
             if rim_difference > 0.05:
                 continue
+
 
             # Look for handle formation and breakout
             handle_found = False
@@ -490,10 +495,19 @@ def detect_cup_and_handle(data, config, require_preceding_trend=True):
                 current_date = data.loc[k, 'Date']
 
                 handle_depth = (right_rim_high - current_low) / right_rim_high
+                handle_duration = (current_date - right_rim_date).days
+
+                # Enforce: handle must not be too deep or too long
                 if handle_depth > config['HANDLE_DEPTH_MAX']:
                     break
+                if handle_duration > config['HANDLE_DURATION_MAX']:
+                    break
 
-                handle_duration = (current_date - right_rim_date).days
+                # Handle must not retrace more than 1/3 of cup height
+                cup_height = right_rim_high - cup_bottom_low
+                if cup_height > 0 and (right_rim_high - current_low) > (cup_height / 3):
+                    break
+
                 if handle_duration >= config['HANDLE_DURATION_MIN']:
                     # Look for breakout
                     for m in range(k + 1, min(len(data), k + 30)):
@@ -760,34 +774,63 @@ def plot_ch_pattern(df, pattern, stock_name, output_path):
     # Price line
     ax_price.plot(df_zoom['Date'], df_zoom['Close'], label='Close Price', color='navy')
 
-    # Mark pattern points
-    ax_price.scatter([left_rim_date, right_rim_date], [left_rim_high, right_rim_high], 
-                    color=['blue', 'blue'], s=120, zorder=5, label='Cup Rims')
-    ax_price.scatter([cup_bottom_date], [cup_bottom_low], 
-                    color='red', s=120, zorder=5, label='Cup Bottom')
-    ax_price.scatter([handle_date], [handle_low], 
-                    color='orange', s=100, zorder=5, label='Handle Low')
 
-    # Draw cup outline
+    # Mark Cup Rims (unique labels)
+    ax_price.scatter([left_rim_date], [left_rim_high], color='blue', s=120, zorder=5, label='Left Rim', marker='o', edgecolors='black', linewidths=1.5)
+    ax_price.scatter([right_rim_date], [right_rim_high], color='blue', s=120, zorder=5, label='Right Rim', marker='o', edgecolors='black', linewidths=1.5)
+    # Mark Cup Bottom (single dot)
+    ax_price.scatter([cup_bottom_date], [cup_bottom_low], color='red', s=120, zorder=6, label='Cup Bottom', marker='o', edgecolors='black', linewidths=1.5)
+
+    # Draw Cup Curve as a rounded, dashed line (fit a parabola for smoothness)
     cup_section = df[(df['Date'] >= left_rim_date) & (df['Date'] <= right_rim_date)]
-    if not cup_section.empty:
-        ax_price.plot(cup_section['Date'], cup_section['Low'], 'g--', 
-                     alpha=0.7, linewidth=2, label='Cup Shape')
+    if not cup_section.empty and len(cup_section) >= 5:
+        # Fit a parabola to the cup for smoothness
+        import matplotlib.dates as mdates
+        x = mdates.date2num(cup_section['Date'])
+        y = cup_section['Low']
+        try:
+            coeffs = np.polyfit(x, y, 2)
+            x_fit = np.linspace(x[0], x[-1], 100)
+            y_fit = np.polyval(coeffs, x_fit)
+            ax_price.plot(mdates.num2date(x_fit), y_fit, 'g--', alpha=0.8, linewidth=2.5, label='Cup Curve')
+        except Exception:
+            ax_price.plot(cup_section['Date'], cup_section['Low'], 'g--', alpha=0.7, linewidth=2, label='Cup Curve')
+    else:
+        ax_price.plot(cup_section['Date'], cup_section['Low'], 'g--', alpha=0.7, linewidth=2, label='Cup Curve')
 
-    # Draw resistance line
+    # Add Handle: short, downward-sloping line on right side of cup
+    # Draw from right_rim to handle_low
+    ax_price.plot([right_rim_date, handle_date], [right_rim_high, handle_low], color='orange', linestyle='-', linewidth=2.5, label='Handle')
+    # Mark Handle Low
+    ax_price.scatter([handle_date], [handle_low], color='orange', s=100, zorder=6, label='Handle Low', marker='v', edgecolors='black', linewidths=1.2)
+
+    # Draw Resistance Level: horizontal line from right rim
     resistance_level = max(left_rim_high, right_rim_high)
-    ax_price.hlines(resistance_level, df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1], 
-                   colors='purple', linestyles='--', alpha=0.7, label='Resistance Level')
+    ax_price.hlines(resistance_level, right_rim_date, df_zoom['Date'].iloc[-1],
+                   colors='purple', linestyles='--', alpha=0.8, linewidth=2, label='Resistance Level')
 
-    # Mark breakout
-    ax_price.scatter(breakout_date, breakout_price, color='green', s=150, 
-                    zorder=6, marker='*', label='Breakout')
+    # Highlight Breakout point with a star symbol
+    ax_price.scatter(breakout_date, breakout_price, color='green', s=180,
+                    zorder=7, marker='*', label='Breakout')
+
+    # --- Annotations for key points ---
+    ax_price.annotate('Left Rim', (left_rim_date, left_rim_high), xytext=(-40, 30), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', color='blue'), color='blue', fontsize=10)
+    ax_price.annotate('Right Rim', (right_rim_date, right_rim_high), xytext=(20, 30), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', color='blue'), color='blue', fontsize=10)
+    ax_price.annotate('Cup Bottom', (cup_bottom_date, cup_bottom_low), xytext=(0, -40), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', color='red'), color='red', fontsize=10)
+    ax_price.annotate('Handle', (handle_date, handle_low), xytext=(30, -30), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', color='orange'), color='orange', fontsize=10)
+    ax_price.annotate('Breakout', (breakout_date, breakout_price), xytext=(20, 40), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', color='green'), color='green', fontsize=10)
 
     # Volume bars
     if 'Volume' in df_zoom.columns:
         ax_vol.bar(df_zoom['Date'], df_zoom['Volume'], color='gray', alpha=0.6)
+        # Make breakout volume bar thicker and green
         try:
-            ax_vol.bar(breakout_date, df.loc[breakout_idx, 'Volume'], color='green', alpha=0.9)
+            ax_vol.bar(breakout_date, df.loc[breakout_idx, 'Volume'], color='green', alpha=0.95, width=1.5, label='Breakout Volume')
         except Exception:
             pass
 
@@ -795,7 +838,10 @@ def plot_ch_pattern(df, pattern, stock_name, output_path):
     ax_price.set_ylabel('Price')
     ax_vol.set_ylabel('Volume')
     ax_vol.set_xlabel('Date')
-    ax_price.legend(loc='upper left')
+    # Remove duplicate legend entries
+    handles, labels = ax_price.get_legend_handles_labels()
+    unique = dict(zip(labels, handles))
+    ax_price.legend(unique.values(), unique.keys(), loc='upper left', fontsize=9)
     ax_price.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
@@ -914,9 +960,17 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
         # Head and Shoulders
         if 'head_and_shoulders' in patterns:
             hns_patterns = detect_head_and_shoulders(df_slice, hns_config, require_preceding_trend)
+            try:
+                from validator.validate_hns import validate_hns
+            except ImportError:
+                validate_hns = None
             for pattern in hns_patterns:
                 if pattern_counts['head_and_shoulders'] >= max_patterns_per_timeframe:
                     break
+                # Validate pattern
+                if validate_hns:
+                    validation = validate_hns(df_slice, pattern)
+                    pattern['validation'] = validation
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe
                 timeframe_patterns.append(pattern)
@@ -925,9 +979,18 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
         # Cup and Handle
         if 'cup_and_handle' in patterns:
             ch_patterns = detect_cup_and_handle(df_slice, ch_config, require_preceding_trend)
+            # Import validator
+            try:
+                from validator.validate_cup_handle import validate_cup_handle
+            except ImportError:
+                validate_cup_handle = None
             for pattern in ch_patterns:
                 if pattern_counts['cup_and_handle'] >= max_patterns_per_timeframe:
                     break
+                # Validate pattern
+                if validate_cup_handle:
+                    validation = validate_cup_handle(df_slice, pattern)
+                    pattern['validation'] = validation
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe
                 timeframe_patterns.append(pattern)
@@ -1007,6 +1070,24 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
         
         all_results.extend(timeframe_patterns)
     
+    # Log Cup and Handle scores if any (only if at least one has a score)
+    try:
+        from log.log_cup_handle_scores import log_cup_handle_scores
+        ch_patterns_with_score = [p for p in all_results if p.get('type') == 'cup_and_handle' and 'validation' in p]
+        if ch_patterns_with_score:
+            ch_score_log = Path(output_dir) / 'reports' / 'score' / 'ch' / f'{symbol}_cup_handle_scores.csv'
+            log_cup_handle_scores(ch_patterns_with_score, ch_score_log)
+    except Exception:
+        pass
+    # Log HNS scores if any (only if at least one has a score)
+    try:
+        from log.log_hns_scores import log_hns_scores
+        hns_patterns_with_score = [p for p in all_results if p.get('type') == 'head_and_shoulders' and 'validation' in p]
+        if hns_patterns_with_score:
+            hns_score_log = Path(output_dir) / 'reports' / 'score' / 'hns' / f'{symbol}_hns_scores.csv'
+            log_hns_scores(hns_patterns_with_score, hns_score_log)
+    except Exception:
+        pass
     return all_results
 
 
