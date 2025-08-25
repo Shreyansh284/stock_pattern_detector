@@ -718,11 +718,15 @@ def plot_hns_pattern(df, pattern, stock_name, output_path):
     # Price line
     ax_price.plot(df_zoom['Date'], df_zoom['Close'], label='Close Price', color='navy')
 
+
     # Mark pattern points
     ax_price.scatter([p1_date, p2_date, p3_date], [p1_high, p2_high, p3_high], 
                     color=['orange', 'red', 'orange'], s=120, zorder=5, label='Shoulders & Head')
     ax_price.scatter([t1_date, t2_date], [t1_low, t2_low], 
                     color='blue', s=100, zorder=5, label='Troughs')
+
+    # Draw lines connecting the three nodes (shoulder-head-shoulder)
+    ax_price.plot([p1_date, p2_date, p3_date], [p1_high, p2_high, p3_high], color='black', linestyle='-', linewidth=2, alpha=0.7, label='H&S Line')
 
     # Draw neckline
     slope = pattern['neckline_slope']
