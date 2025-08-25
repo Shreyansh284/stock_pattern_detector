@@ -871,21 +871,49 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
     
     ax_price.plot(df_zoom['Date'], df_zoom['Close'], color='navy', label='Close')
 
-    # Mark pattern points
+
+    # Mark pattern points and draw W/M shape with fill and dotted neckline
     if pattern['type'] == 'double_top':
-        ax_price.scatter([p1_date, p2_date], [p1_price, p2_price], 
-                        color=['red', 'red'], s=120, zorder=5, label='Double Top')
+        # M shape: extend from left context to P1
+        # Find the last price before P1 in the zoomed data
+        left_idx = df_zoom[df_zoom['Date'] < p1_date].index
+        if len(left_idx) > 0:
+            left_date = df_zoom.loc[left_idx[-1], 'Date']
+            left_price = df_zoom.loc[left_idx[-1], 'Close']
+            x_points = [left_date, p1_date, t_date, p2_date, breakout_date]
+            y_points = [left_price, p1_price, t_price, p2_price, breakout_price]
+        else:
+            x_points = [p1_date, t_date, p2_date, breakout_date]
+            y_points = [p1_price, t_price, p2_price, breakout_price]
+        ax_price.scatter([p1_date, p2_date], [p1_price, p2_price], color=['red', 'red'], s=120, zorder=5, label='Double Top')
         ax_price.scatter([t_date], [t_price], color='blue', s=100, zorder=5, label='Valley')
+        # Draw sharp M shape
+        ax_price.plot(x_points, y_points, color='crimson', linestyle='-', linewidth=2.5, alpha=0.95, label='M Shape')
+        # Join the two tops
+        ax_price.plot([p1_date, p2_date], [p1_price, p2_price], color='crimson', linestyle='-', linewidth=2.5, alpha=0.7)
         pattern_title = f"{stock_name} - Double Top Pattern"
     else:
-        ax_price.scatter([p1_date, p2_date], [p1_price, p2_price], 
-                        color=['green', 'green'], s=120, zorder=5, label='Double Bottom')
+        # W shape: extend from left context to P1
+        left_idx = df_zoom[df_zoom['Date'] < p1_date].index
+        if len(left_idx) > 0:
+            left_date = df_zoom.loc[left_idx[-1], 'Date']
+            left_price = df_zoom.loc[left_idx[-1], 'Close']
+            x_points = [left_date, p1_date, t_date, p2_date, breakout_date]
+            y_points = [left_price, p1_price, t_price, p2_price, breakout_price]
+        else:
+            x_points = [p1_date, t_date, p2_date, breakout_date]
+            y_points = [p1_price, t_price, p2_price, breakout_price]
+        ax_price.scatter([p1_date, p2_date], [p1_price, p2_price], color=['green', 'green'], s=120, zorder=5, label='Double Bottom')
         ax_price.scatter([t_date], [t_price], color='red', s=100, zorder=5, label='Peak')
+        # Draw sharp W shape
+        ax_price.plot(x_points, y_points, color='crimson', linestyle='-', linewidth=2.5, alpha=0.95, label='W Shape')
+        # Join the two bottoms
+        ax_price.plot([p1_date, p2_date], [p1_price, p2_price], color='crimson', linestyle='-', linewidth=2.5, alpha=0.7)
         pattern_title = f"{stock_name} - Double Bottom Pattern"
 
-    # Draw neckline
+    # Draw neckline (dotted)
     ax_price.hlines(neckline_level, df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1], 
-                   colors='purple', linestyles='--', label='Neckline')
+                   colors='teal', linestyles='dotted', linewidth=2, label='Neckline')
 
     # Mark breakout
     ax_price.scatter(breakout_date, breakout_price, color='orange', s=150, 
