@@ -725,9 +725,6 @@ def plot_hns_pattern(df, pattern, stock_name, output_path):
     ax_price.scatter([t1_date, t2_date], [t1_low, t2_low], 
                     color='blue', s=100, zorder=5, label='Troughs')
 
-    # Draw lines connecting the three nodes (shoulder-head-shoulder)
-    ax_price.plot([p1_date, p2_date, p3_date], [p1_high, p2_high, p3_high], color='black', linestyle='-', linewidth=2, alpha=0.7, label='H&S Line')
-
     # Draw neckline
     slope = pattern['neckline_slope']
     intercept = pattern['neckline_intercept']
@@ -785,26 +782,6 @@ def plot_ch_pattern(df, pattern, stock_name, output_path):
     # Mark Cup Bottom (single dot)
     ax_price.scatter([cup_bottom_date], [cup_bottom_low], color='red', s=120, zorder=6, label='Cup Bottom', marker='o', edgecolors='black', linewidths=1.5)
 
-    # Draw Cup Curve as a rounded, dashed line (fit a parabola for smoothness)
-    cup_section = df[(df['Date'] >= left_rim_date) & (df['Date'] <= right_rim_date)]
-    if not cup_section.empty and len(cup_section) >= 5:
-        # Fit a parabola to the cup for smoothness
-        import matplotlib.dates as mdates
-        x = mdates.date2num(cup_section['Date'])
-        y = cup_section['Low']
-        try:
-            coeffs = np.polyfit(x, y, 2)
-            x_fit = np.linspace(x[0], x[-1], 100)
-            y_fit = np.polyval(coeffs, x_fit)
-            ax_price.plot(mdates.num2date(x_fit), y_fit, 'g--', alpha=0.8, linewidth=2.5, label='Cup Curve')
-        except Exception:
-            ax_price.plot(cup_section['Date'], cup_section['Low'], 'g--', alpha=0.7, linewidth=2, label='Cup Curve')
-    else:
-        ax_price.plot(cup_section['Date'], cup_section['Low'], 'g--', alpha=0.7, linewidth=2, label='Cup Curve')
-
-    # Add Handle: short, downward-sloping line on right side of cup
-    # Draw from right_rim to handle_low
-    ax_price.plot([right_rim_date, handle_date], [right_rim_high, handle_low], color='orange', linestyle='-', linewidth=2.5, label='Handle')
     # Mark Handle Low
     ax_price.scatter([handle_date], [handle_low], color='orange', s=100, zorder=6, label='Handle Low', marker='v', edgecolors='black', linewidths=1.2)
 
