@@ -713,7 +713,27 @@ def plot_hns_pattern(df, pattern, stock_name, output_path):
     p3_date, p3_high, p3_idx = pattern['P3']
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
-    start_date = p1_date - pd.Timedelta(days=30)
+    # Find a meaningful swing low before the Left Shoulder to draw a longer left leg
+    left_swing_date = None
+    left_swing_price = None
+    pre_seg = df[df['Date'] < p1_date]
+    if not pre_seg.empty:
+        pre_tail = pre_seg.tail(220).copy()  # limit search window
+        local_min_mask = (pre_tail['Low'] < pre_tail['Low'].shift(1)) & (pre_tail['Low'] <= pre_tail['Low'].shift(-1))
+        candidates = pre_tail[local_min_mask]
+        if not candidates.empty:
+            row = candidates.iloc[-1]
+        else:
+            row = pre_tail.loc[pre_tail['Low'].idxmin()]
+        left_swing_date = row['Date']
+        left_swing_price = float(row['Low'])
+
+    # Extend the plotting window further left to include the swing low context
+    start_date_default = p1_date - pd.Timedelta(days=90)
+    if left_swing_date is not None:
+        start_date = min(left_swing_date - pd.Timedelta(days=5), start_date_default)
+    else:
+        start_date = start_date_default
     end_date = breakout_date + pd.Timedelta(days=30)
 
     df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
@@ -896,12 +916,7 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
     ax_price.scatter(breakout_date, breakout_price, color='orange', s=150, 
                     marker='*', label='Breakout')
 
-    # Ensure right diagonal ends exactly at breakout (no extension beyond) for Double Bottom
-    if pattern['type'] == 'double_bottom':
-        try:
-            ax_price.plot([p2_date, breakout_date], [p2_price, breakout_price], color='teal', linewidth=2, alpha=0.9)
-        except Exception:
-            pass
+    # (Matplotlib) Keep original style; no extra right-leg line enforced
 
     # Volume bars
     if 'Volume' in df_zoom.columns:
@@ -973,20 +988,69 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
     for tr in _plotly_price_traces(df_zoom, chart_type):
         fig.add_trace(tr, row=1, col=1)
 
-    # Draw neckline
+    # Neckline (dotted)
     slope = pattern['neckline_slope']
     intercept = pattern['neckline_intercept']
+    def _neck_y(d):
+        return slope * d.toordinal() + intercept
     nx = [df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]]
-    ny = [slope * d.toordinal() + intercept for d in nx]
-    fig.add_trace(go.Scatter(x=nx, y=ny, mode='lines', name='Neckline', line=dict(color='#0891b2', dash='dash')), row=1, col=1)
+    ny = [_neck_y(d) for d in nx]
+    fig.add_trace(go.Scatter(x=nx, y=ny, mode='lines', name='Neckline',
+                             line=dict(color='#0891b2', dash='dash', width=2)), row=1, col=1)
 
-    # Mark points: LS -> neckline -> Head -> neckline -> RS -> Breakout
+    # Outline legs similar to the reference (green)
+    line_color = '#16a34a'
+    fill_color = 'rgba(34, 197, 94, 0.18)'
+
+    # Pre-context left leg into Left Shoulder, if we have data before P1 in the zoom window
+    if left_swing_date is not None:
+        fig.add_trace(go.Scatter(x=[left_swing_date, p1_date], y=[left_swing_price, p1_high],
+                                 mode='lines', name='Left Leg',
+                                 line=dict(color=line_color, width=2), showlegend=False), row=1, col=1)
+    else:
+        pre_idx = df_zoom[df_zoom['Date'] < p1_date].index
+        if len(pre_idx) > 0:
+            left_date = df_zoom.loc[pre_idx[-1], 'Date']
+            left_price = df_zoom.loc[pre_idx[-1], 'Close']
+            fig.add_trace(go.Scatter(x=[left_date, p1_date], y=[left_price, p1_high],
+                                     mode='lines', name='Left Leg',
+                                     line=dict(color=line_color, width=2), showlegend=False), row=1, col=1)
+
+    # Main zigzag path P1 -> T1 -> P2 -> T2 -> P3
+    outline_x = [p1_date, t1_date, p2_date, t2_date, p3_date]
+    outline_y = [p1_high, t1_low, p2_high, t2_low, p3_high]
+    fig.add_trace(go.Scatter(x=outline_x, y=outline_y, mode='lines', name='Pattern',
+                             line=dict(color=line_color, width=2)), row=1, col=1)
+
+    # Right leg from P3 to breakout
+    fig.add_trace(go.Scatter(x=[p3_date, breakout_date], y=[p3_high, breakout_price],
+                             mode='lines', name='Right Leg',
+                             line=dict(color=line_color, width=2), showlegend=False), row=1, col=1)
+
+    # Shaded regions between neckline and the edges (two polygons: P1-T1-P2 and P2-T2-P3)
+    x_seg1 = [p1_date, t1_date, p2_date]
+    neck_seg1 = [_neck_y(d) for d in x_seg1]
+    price_seg1 = [p1_high, t1_low, p2_high]
+    poly1_x = x_seg1 + list(reversed(x_seg1))
+    poly1_y = neck_seg1 + list(reversed(price_seg1))
+    fig.add_trace(go.Scatter(x=poly1_x, y=poly1_y, mode='lines', name='Region',
+                             line=dict(color=line_color, width=1), fill='toself',
+                             fillcolor=fill_color, showlegend=False), row=1, col=1)
+
+    x_seg2 = [p2_date, t2_date, p3_date]
+    neck_seg2 = [_neck_y(d) for d in x_seg2]
+    price_seg2 = [p2_high, t2_low, p3_high]
+    poly2_x = x_seg2 + list(reversed(x_seg2))
+    poly2_y = neck_seg2 + list(reversed(price_seg2))
+    fig.add_trace(go.Scatter(x=poly2_x, y=poly2_y, mode='lines', name='Region',
+                             line=dict(color=line_color, width=1), fill='toself',
+                             fillcolor=fill_color, showlegend=False), row=1, col=1)
+
+    # Minimal, clear labels
     markers = [
-        (p1_date, p1_high, 'Left Shoulder', '#f59e0b'),
-        (t1_date, t1_low, 'Neckline', '#3b82f6'),
-        (p2_date, p2_high, 'Head', '#ef4444'),
-        (t2_date, t2_low, 'Neckline', '#3b82f6'),
-        (p3_date, p3_high, 'Right Shoulder', '#f59e0b'),
+        (p1_date, p1_high, 'Left Shoulder', line_color),
+        (p2_date, p2_high, 'Head', line_color),
+        (p3_date, p3_high, 'Right Shoulder', line_color),
         (breakout_date, breakout_price, 'Breakout', '#8b5cf6'),
     ]
     for x, y, label, color in markers:
@@ -1155,22 +1219,33 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
         except Exception:
             pass
     else:
-        # For Double Top keep previous simple pre-context line
-        pre_idx = df_zoom[df_zoom['Date'] < p1_date].index
-        if len(pre_idx) > 0:
-            left_date = df_zoom.loc[pre_idx[-1], 'Date']
-            left_price = df_zoom.loc[pre_idx[-1], 'Close']
-            fig.add_trace(
-                go.Scatter(
-                    x=[left_date, p1_date],
-                    y=[left_price, p1_price],
-                    mode='lines',
-                    name='Left Leg',
-                    line=dict(color=c_main, width=2),
-                    showlegend=False,
-                ),
-                row=1, col=1
-            )
+        # For Double Top: from last swing low before Top 1 -> Top 1
+        try:
+            p1_idx = pattern['P1'][2]
+            seg = df.iloc[:p1_idx]
+            if 'is_swing_low' in seg.columns:
+                lows = seg[seg.get('is_swing_low', False)]
+            else:
+                win = 5
+                min_mask = seg['Low'] == seg['Low'].rolling(window=win, center=True, min_periods=1).min()
+                lows = seg[min_mask]
+            if not lows.empty:
+                left_idx = lows.index[-1]
+                left_date = df.loc[left_idx, 'Date']
+                left_price = df.loc[left_idx, 'Low']
+                fig.add_trace(
+                    go.Scatter(
+                        x=[left_date, p1_date],
+                        y=[left_price, p1_price],
+                        mode='lines',
+                        name='Left Leg',
+                        line=dict(color=c_main, width=2),
+                        showlegend=False,
+                    ),
+                    row=1, col=1
+                )
+        except Exception:
+            pass
 
     # Add right-side line from P2 to breakout (to mirror reference chart)
     fig.add_trace(
