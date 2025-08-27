@@ -896,6 +896,13 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
     ax_price.scatter(breakout_date, breakout_price, color='orange', s=150, 
                     marker='*', label='Breakout')
 
+    # Ensure right diagonal ends exactly at breakout (no extension beyond) for Double Bottom
+    if pattern['type'] == 'double_bottom':
+        try:
+            ax_price.plot([p2_date, breakout_date], [p2_price, breakout_price], color='teal', linewidth=2, alpha=0.9)
+        except Exception:
+            pass
+
     # Volume bars
     if 'Volume' in df_zoom.columns:
         ax_vol.bar(df_zoom['Date'], df_zoom['Volume'], color='gray', alpha=0.6)
@@ -1087,18 +1094,128 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
     for tr in _plotly_price_traces(df_zoom, chart_type):
         fig.add_trace(tr, row=1, col=1)
 
-    fig.add_trace(go.Scatter(x=[df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]],
-                             y=[neckline_level, neckline_level], mode='lines',
-                             name='Neckline', line=dict(color='#0d9488', dash='dot')), row=1, col=1)
+    # Neckline (dotted)
+    fig.add_trace(
+        go.Scatter(
+            x=[df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]],
+            y=[neckline_level, neckline_level],
+            mode='lines',
+            name='Neckline',
+            line=dict(color='#0d9488', dash='dot', width=2)
+        ),
+        row=1, col=1
+    )
 
-    label_main = 'Double Top' if pattern['type'] == 'double_top' else 'Double Bottom'
-    c_main = '#ef4444' if pattern['type'] == 'double_top' else '#16a34a'
-    peak_label = 'Valley' if pattern['type'] == 'double_top' else 'Peak'
-    peak_color = '#3b82f6' if pattern['type'] == 'double_top' else '#ef4444'
+    is_dt = pattern['type'] == 'double_top'
+    label_main = 'Double Top' if is_dt else 'Double Bottom'
+    c_main = '#ef4444' if is_dt else '#16a34a'
+    fill_color = 'rgba(239, 68, 68, 0.15)' if is_dt else 'rgba(22, 163, 74, 0.15)'
+
+    # Outline of the M/W (P1 -> T -> P2)
+    fig.add_trace(
+        go.Scatter(
+            x=[p1_date, t_date, p2_date],
+            y=[p1_price, neckline_level, p2_price],
+            mode='lines',
+            name='Pattern',
+            line=dict(color=c_main, width=2)
+        ),
+        row=1, col=1
+    )
+
+    # Left-side line logic
+    if not is_dt:
+        # For Double Bottom: from last swing high before Bottom 1 -> Bottom 1
+        try:
+            p1_idx = pattern['P1'][2]
+            # Find last swing high before p1_idx within df (not just zoom)
+            seg = df.iloc[:p1_idx]
+            if 'is_swing_high' in seg.columns:
+                highs = seg[seg.get('is_swing_high', False)]
+            else:
+                # Fallback: local maxima by rolling window on High
+                win = 5
+                max_mask = seg['High'] == seg['High'].rolling(window=win, center=True, min_periods=1).max()
+                highs = seg[max_mask]
+            if not highs.empty:
+                left_idx = highs.index[-1]
+                left_date = df.loc[left_idx, 'Date']
+                left_price = df.loc[left_idx, 'High']
+                fig.add_trace(
+                    go.Scatter(
+                        x=[left_date, p1_date],
+                        y=[left_price, p1_price],
+                        mode='lines',
+                        name='Left Leg',
+                        line=dict(color=c_main, width=2),
+                        showlegend=False,
+                    ),
+                    row=1, col=1
+                )
+        except Exception:
+            pass
+    else:
+        # For Double Top keep previous simple pre-context line
+        pre_idx = df_zoom[df_zoom['Date'] < p1_date].index
+        if len(pre_idx) > 0:
+            left_date = df_zoom.loc[pre_idx[-1], 'Date']
+            left_price = df_zoom.loc[pre_idx[-1], 'Close']
+            fig.add_trace(
+                go.Scatter(
+                    x=[left_date, p1_date],
+                    y=[left_price, p1_price],
+                    mode='lines',
+                    name='Left Leg',
+                    line=dict(color=c_main, width=2),
+                    showlegend=False,
+                ),
+                row=1, col=1
+            )
+
+    # Add right-side line from P2 to breakout (to mirror reference chart)
+    fig.add_trace(
+        go.Scatter(
+            x=[p2_date, breakout_date],
+            y=[p2_price, breakout_price],
+            mode='lines',
+            name='Right Leg',
+            line=dict(color=c_main, width=2),
+            showlegend=False,
+        ),
+        row=1, col=1
+    )
+
+    # Shaded triangles to emphasize the pattern legs relative to neckline
+    if is_dt:
+        # Shade above neckline towards tops
+        tri1_x = [p1_date, t_date, p1_date]
+        tri1_y = [p1_price, neckline_level, neckline_level]
+        tri2_x = [p2_date, t_date, p2_date]
+        tri2_y = [p2_price, neckline_level, neckline_level]
+    else:
+        # Shade below neckline towards bottoms (W)
+        tri1_x = [p1_date, t_date, p1_date]
+        tri1_y = [p1_price, neckline_level, neckline_level]
+        tri2_x = [p2_date, t_date, p2_date]
+        tri2_y = [p2_price, neckline_level, neckline_level]
+
+    fig.add_trace(go.Scatter(x=tri1_x, y=tri1_y, name='Pattern Zone',
+                             mode='lines', line=dict(color=c_main, width=1),
+                             fill='toself', fillcolor=fill_color, showlegend=False), row=1, col=1)
+    fig.add_trace(go.Scatter(x=tri2_x, y=tri2_y, name='Pattern Zone',
+                             mode='lines', line=dict(color=c_main, width=1),
+                             fill='toself', fillcolor=fill_color, showlegend=False), row=1, col=1)
+
+    # Markers and labels for points
+    lbl1 = 'Top 1' if is_dt else 'Bottom 1'
+    lbl2 = 'Top 2' if is_dt else 'Bottom 2'
+    mid_lbl = 'Trough' if is_dt else 'Peak'
+    mid_color = '#3b82f6'
+
     marks = [
-        (p1_date, p1_price, label_main, c_main),
-        (t_date, t_price, peak_label, peak_color),
-        (p2_date, p2_price, label_main, c_main),
+        (p1_date, p1_price, lbl1, c_main),
+        (t_date, t_price, mid_lbl, mid_color),
+        (p2_date, p2_price, lbl2, c_main),
         (breakout_date, breakout_price, 'Breakout', '#f59e0b'),
     ]
     for x, y, label, color in marks:
@@ -1106,6 +1223,23 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
                                  text=[label], textposition='top center',
                                  marker=dict(color=color, size=10, symbol='circle')), row=1, col=1)
 
+    # Measured move target from neckline height
+    if is_dt:
+        height = abs(max(p1_price, p2_price) - neckline_level)
+        target = neckline_level - height
+    else:
+        height = abs(neckline_level - min(p1_price, p2_price))
+        target = neckline_level + height
+
+    # Vertical dotted line from breakout to target + target annotation
+    fig.add_shape(type='line', xref='x', yref='y',
+                  x0=breakout_date, x1=breakout_date, y0=breakout_price, y1=target,
+                  line=dict(color='#4b5563', width=1, dash='dot'), row=1, col=1)
+    fig.add_annotation(x=breakout_date, y=target, text='Target', showarrow=True,
+                       arrowhead=2, yshift=10, bgcolor='#e5e7eb', bordercolor='#9ca3af',
+                       font=dict(color='#111827', size=11), row=1, col=1)
+
+    # Volume
     fig.add_trace(_plotly_volume_trace(df_zoom), row=2, col=1)
 
     fig.update_layout(
