@@ -1267,8 +1267,13 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                     'double_bottom': 'DB'
                 }
                 
-                # Create nested structure: charts/symbol/timeframe/pattern_type/
-                pattern_dir = charts_base / symbol / timeframe / pattern_abbrev[pattern_type]
+                # Create nested structure:
+                # charts/symbol/timeframe/pattern_type/<backend>/[chart_type]
+                pattern_root = charts_base / symbol / timeframe / pattern_abbrev[pattern_type]
+                backend_dir = 'plotly' if use_plotly else 'matplotlib'
+                pattern_dir = pattern_root / backend_dir
+                if use_plotly:
+                    pattern_dir = pattern_dir / (chart_type.lower() if chart_type else 'candle')
                 pattern_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Generate filename
