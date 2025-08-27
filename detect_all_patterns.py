@@ -33,6 +33,14 @@ import json
 import random
 from pathlib import Path
 
+# Optional Plotly backend (interactive charts)
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    _PLOTLY_AVAILABLE = True
+except Exception:
+    _PLOTLY_AVAILABLE = False
+
 # =============================================================================
 # CONFIGURATION CONSTANTS
 # =============================================================================
@@ -907,12 +915,221 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
     plt.close(fig)
 
 # =============================================================================
+# PLOTLY PLOTTING FUNCTIONS (optional backend)
+# =============================================================================
+
+def _plotly_price_traces(df_zoom: pd.DataFrame, chart_type: str):
+    """Return Plotly traces for the price chart based on chart_type.
+    Supported: 'candle', 'line', 'ohlc'. Defaults to 'candle' on invalid input.
+    """
+    chart_type = (chart_type or 'candle').lower()
+    x = df_zoom['Date']
+    if chart_type == 'line':
+        return [go.Scatter(x=x, y=df_zoom['Close'], mode='lines', name='Close',
+                           line=dict(color='#1f77b4', width=2))]
+    elif chart_type == 'ohlc':
+        return [go.Ohlc(x=x,
+                        open=df_zoom['Open'], high=df_zoom['High'], low=df_zoom['Low'], close=df_zoom['Close'],
+                        name='OHLC')]
+    else:  # 'candle'
+        return [go.Candlestick(x=x,
+                               open=df_zoom['Open'], high=df_zoom['High'], low=df_zoom['Low'], close=df_zoom['Close'],
+                               name='Candles', increasing_line_color='#16a34a', decreasing_line_color='#dc2626')]
+
+def _plotly_volume_trace(df_zoom: pd.DataFrame):
+    """Create a volume bar trace color-coded by up/down days."""
+    colors = np.where(df_zoom['Close'] >= df_zoom['Open'], '#16a34a', '#dc2626')
+    return go.Bar(x=df_zoom['Date'], y=df_zoom['Volume'], name='Volume', marker_color=colors, opacity=0.6)
+
+def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'):
+    """Plot Head and Shoulders with Plotly, interactive with volume subplot and annotations."""
+    if not _PLOTLY_AVAILABLE:
+        raise RuntimeError('Plotly is not available in this environment')
+
+    p1_date, p1_high, p1_idx = pattern['P1']
+    t1_date, t1_low, t1_idx = pattern['T1']
+    p2_date, p2_high, p2_idx = pattern['P2']
+    t2_date, t2_low, t2_idx = pattern['T2']
+    p3_date, p3_high, p3_idx = pattern['P3']
+    breakout_date, breakout_price, breakout_idx = pattern['breakout']
+
+    start_date = p1_date - pd.Timedelta(days=30)
+    end_date = breakout_date + pd.Timedelta(days=30)
+
+    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    if df_zoom.empty:
+        return
+
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
+                        row_heights=[0.72, 0.28])
+
+    for tr in _plotly_price_traces(df_zoom, chart_type):
+        fig.add_trace(tr, row=1, col=1)
+
+    # Draw neckline
+    slope = pattern['neckline_slope']
+    intercept = pattern['neckline_intercept']
+    nx = [df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]]
+    ny = [slope * d.toordinal() + intercept for d in nx]
+    fig.add_trace(go.Scatter(x=nx, y=ny, mode='lines', name='Neckline', line=dict(color='#0891b2', dash='dash')), row=1, col=1)
+
+    # Mark points: LS -> neckline -> Head -> neckline -> RS -> Breakout
+    markers = [
+        (p1_date, p1_high, 'Left Shoulder', '#f59e0b'),
+        (t1_date, t1_low, 'Neckline', '#3b82f6'),
+        (p2_date, p2_high, 'Head', '#ef4444'),
+        (t2_date, t2_low, 'Neckline', '#3b82f6'),
+        (p3_date, p3_high, 'Right Shoulder', '#f59e0b'),
+        (breakout_date, breakout_price, 'Breakout', '#8b5cf6'),
+    ]
+    for x, y, label, color in markers:
+        fig.add_trace(go.Scatter(x=[x], y=[y], mode='markers+text', name=label,
+                                 text=[label], textposition='top center',
+                                 marker=dict(color=color, size=10, symbol='circle')), row=1, col=1)
+
+    # Volume
+    fig.add_trace(_plotly_volume_trace(df_zoom), row=2, col=1)
+
+    fig.update_layout(
+        title=f"{stock_name} - Head and Shoulders",
+        template='plotly_white',
+        margin=dict(l=40, r=20, t=60, b=40),
+        hovermode='x unified',
+        showlegend=True,
+    )
+    rs_visible = (chart_type or 'candle').lower() in ('candle', 'ohlc')
+    fig.update_xaxes(showgrid=True, gridcolor='#e5e7eb', row=1, col=1, rangeslider_visible=rs_visible)
+    fig.update_yaxes(title_text='Price', row=1, col=1)
+    fig.update_yaxes(title_text='Volume', row=2, col=1)
+    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+
+    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True)
+
+def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle'):
+    """Plot Cup and Handle with Plotly."""
+    if not _PLOTLY_AVAILABLE:
+        raise RuntimeError('Plotly is not available in this environment')
+
+    left_rim_date, left_rim_high, left_rim_idx = pattern['left_rim']
+    cup_bottom_date, cup_bottom_low, cup_bottom_idx = pattern['cup_bottom']
+    right_rim_date, right_rim_high, right_rim_idx = pattern['right_rim']
+    handle_date, handle_low, handle_low_idx = pattern['handle_low']
+    breakout_date, breakout_price, breakout_idx = pattern['breakout']
+
+    start_date = left_rim_date - pd.Timedelta(days=30)
+    end_date = breakout_date + pd.Timedelta(days=30)
+
+    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    if df_zoom.empty:
+        return
+
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
+                        row_heights=[0.72, 0.28])
+
+    for tr in _plotly_price_traces(df_zoom, chart_type):
+        fig.add_trace(tr, row=1, col=1)
+
+    resistance_level = max(left_rim_high, right_rim_high)
+    fig.add_trace(go.Scatter(x=[df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]],
+                             y=[resistance_level, resistance_level], mode='lines',
+                             name='Resistance', line=dict(color='#7c3aed', dash='dash')), row=1, col=1)
+
+    markers = [
+        (left_rim_date, left_rim_high, 'Left Rim', '#3b82f6'),
+        (cup_bottom_date, cup_bottom_low, 'Cup Bottom', '#ef4444'),
+        (right_rim_date, right_rim_high, 'Right Rim', '#3b82f6'),
+        (handle_date, handle_low, 'Handle', '#f59e0b'),
+        (breakout_date, breakout_price, 'Breakout', '#16a34a'),
+    ]
+    for x, y, label, color in markers:
+        fig.add_trace(go.Scatter(x=[x], y=[y], mode='markers+text', name=label,
+                                 text=[label], textposition='top center',
+                                 marker=dict(color=color, size=10, symbol='circle')), row=1, col=1)
+
+    fig.add_trace(_plotly_volume_trace(df_zoom), row=2, col=1)
+
+    fig.update_layout(
+        title=f"{stock_name} - Cup and Handle",
+        template='plotly_white',
+        margin=dict(l=40, r=20, t=60, b=40),
+        hovermode='x unified',
+        showlegend=True,
+    )
+    rs_visible = (chart_type or 'candle').lower() in ('candle', 'ohlc')
+    fig.update_xaxes(showgrid=True, gridcolor='#e5e7eb', row=1, col=1, rangeslider_visible=rs_visible)
+    fig.update_yaxes(title_text='Price', row=1, col=1)
+    fig.update_yaxes(title_text='Volume', row=2, col=1)
+    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+
+    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True)
+
+def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='candle'):
+    """Plot Double Top/Bottom with Plotly."""
+    if not _PLOTLY_AVAILABLE:
+        raise RuntimeError('Plotly is not available in this environment')
+
+    p1_date, p1_price, p1_idx = pattern['P1']
+    t_date, t_price, t_idx = pattern['T']
+    p2_date, p2_price, p2_idx = pattern['P2']
+    breakout_date, breakout_price, breakout_idx = pattern['breakout']
+    neckline_level = pattern['neckline_level']
+
+    start_date = p1_date - pd.Timedelta(days=30)
+    end_date = breakout_date + pd.Timedelta(days=30)
+
+    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    if df_zoom.empty:
+        return
+
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
+                        row_heights=[0.72, 0.28])
+
+    for tr in _plotly_price_traces(df_zoom, chart_type):
+        fig.add_trace(tr, row=1, col=1)
+
+    fig.add_trace(go.Scatter(x=[df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]],
+                             y=[neckline_level, neckline_level], mode='lines',
+                             name='Neckline', line=dict(color='#0d9488', dash='dot')), row=1, col=1)
+
+    label_main = 'Double Top' if pattern['type'] == 'double_top' else 'Double Bottom'
+    c_main = '#ef4444' if pattern['type'] == 'double_top' else '#16a34a'
+    peak_label = 'Valley' if pattern['type'] == 'double_top' else 'Peak'
+    peak_color = '#3b82f6' if pattern['type'] == 'double_top' else '#ef4444'
+    marks = [
+        (p1_date, p1_price, label_main, c_main),
+        (t_date, t_price, peak_label, peak_color),
+        (p2_date, p2_price, label_main, c_main),
+        (breakout_date, breakout_price, 'Breakout', '#f59e0b'),
+    ]
+    for x, y, label, color in marks:
+        fig.add_trace(go.Scatter(x=[x], y=[y], mode='markers+text', name=label,
+                                 text=[label], textposition='top center',
+                                 marker=dict(color=color, size=10, symbol='circle')), row=1, col=1)
+
+    fig.add_trace(_plotly_volume_trace(df_zoom), row=2, col=1)
+
+    fig.update_layout(
+        title=f"{stock_name} - {label_main}",
+        template='plotly_white',
+        margin=dict(l=40, r=20, t=60, b=40),
+        hovermode='x unified',
+        showlegend=True,
+    )
+    rs_visible = (chart_type or 'candle').lower() in ('candle', 'ohlc')
+    fig.update_xaxes(showgrid=True, gridcolor='#e5e7eb', row=1, col=1, rangeslider_visible=rs_visible)
+    fig.update_yaxes(title_text='Price', row=1, col=1)
+    fig.update_yaxes(title_text='Volume', row=2, col=1)
+    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+
+    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True)
+# =============================================================================
 # MAIN PROCESSING FUNCTION
 # =============================================================================
 
 def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir, 
                   require_preceding_trend, min_patterns, max_patterns_per_timeframe,
-                  organize_by_date=False, charts_subdir='charts', reports_subdir='reports'):
+                  organize_by_date=False, charts_subdir='charts', reports_subdir='reports',
+                  use_plotly=False, chart_type='candle'):
     """Process a single symbol for pattern detection."""
     print(f"\nProcessing {symbol}...")
     
@@ -1056,17 +1273,28 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 
                 # Generate filename
                 pattern_count = pattern_counts[pattern_type]
-                filename = f"{symbol}_{pattern_type.upper()}_{timeframe}_{pattern_count}.png"
+                if use_plotly:
+                    filename = f"{symbol}_{pattern_type.upper()}_{timeframe}_{pattern_count}.html"
+                else:
+                    filename = f"{symbol}_{pattern_type.upper()}_{timeframe}_{pattern_count}.png"
                 output_path = pattern_dir / filename
                 
                 # Plot pattern
                 try:
-                    if pattern_type == 'head_and_shoulders':
-                        plot_hns_pattern(df_slice, pattern, symbol, str(output_path))
-                    elif pattern_type == 'cup_and_handle':
-                        plot_ch_pattern(df_slice, pattern, symbol, str(output_path))
-                    elif pattern_type in ['double_top', 'double_bottom']:
-                        plot_double_pattern(df_slice, pattern, symbol, str(output_path))
+                    if use_plotly:
+                        if pattern_type == 'head_and_shoulders':
+                            plotly_hns_pattern(df_slice, pattern, symbol, str(output_path), chart_type=chart_type)
+                        elif pattern_type == 'cup_and_handle':
+                            plotly_ch_pattern(df_slice, pattern, symbol, str(output_path), chart_type=chart_type)
+                        elif pattern_type in ['double_top', 'double_bottom']:
+                            plotly_double_pattern(df_slice, pattern, symbol, str(output_path), chart_type=chart_type)
+                    else:
+                        if pattern_type == 'head_and_shoulders':
+                            plot_hns_pattern(df_slice, pattern, symbol, str(output_path))
+                        elif pattern_type == 'cup_and_handle':
+                            plot_ch_pattern(df_slice, pattern, symbol, str(output_path))
+                        elif pattern_type in ['double_top', 'double_bottom']:
+                            plot_double_pattern(df_slice, pattern, symbol, str(output_path))
                     
                     pattern['image_path'] = str(output_path)
                 except Exception as e:
@@ -1326,6 +1554,13 @@ Examples:
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose output')
 
+    # Plotting backend options
+    parser.add_argument('--plotly', action='store_true',
+                        help='Use Plotly for interactive charts (outputs .html files)')
+    parser.add_argument('--chart-type', type=str, default='candle',
+                        choices=['candle', 'line', 'ohlc'],
+                        help='Chart style when using Plotly (default: candle)')
+
     args = parser.parse_args()
     
     # Handle special options
@@ -1392,14 +1627,18 @@ Examples:
         print(f"    Reports: {args.reports_subdir}/")
         return
     
+    # Warn if Plotly requested but unavailable
+    if getattr(args, 'plotly', False) and not _PLOTLY_AVAILABLE:
+        print("Plotly requested via --plotly but package not installed. Falling back to matplotlib.")
+
     # Main processing loop
     for mode in modes:
         print(f"\n{'='*60}")
         print(f"Running mode: {mode}")
         print(f"{'='*60}")
-        
+
         all_results = []
-        
+
         for symbol in symbols:
             try:
                 results = process_symbol(
@@ -1414,13 +1653,15 @@ Examples:
                     max_patterns_per_timeframe=args.max_patterns_per_timeframe,
                     organize_by_date=args.organize_by_date,
                     charts_subdir=args.charts_subdir,
-                    reports_subdir=args.reports_subdir
+                    reports_subdir=args.reports_subdir,
+                    use_plotly=(args.plotly and _PLOTLY_AVAILABLE),
+                    chart_type=args.chart_type,
                 )
                 all_results.extend(results)
-                
+
                 if args.delay > 0:
                     time.sleep(args.delay)
-                    
+
             except Exception as e:
                 print(f"Error processing {symbol}: {e}")
                 continue
