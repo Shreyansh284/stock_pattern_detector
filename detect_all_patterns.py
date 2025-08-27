@@ -887,10 +887,6 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
             y_points = [p1_price, t_price, p2_price, breakout_price]
         ax_price.scatter([p1_date, p2_date], [p1_price, p2_price], color=['red', 'red'], s=120, zorder=5, label='Double Top')
         ax_price.scatter([t_date], [t_price], color='blue', s=100, zorder=5, label='Valley')
-        # Draw sharp M shape
-        ax_price.plot(x_points, y_points, color='crimson', linestyle='-', linewidth=2.5, alpha=0.95, label='M Shape')
-        # Join the two tops
-        ax_price.plot([p1_date, p2_date], [p1_price, p2_price], color='crimson', linestyle='-', linewidth=2.5, alpha=0.7)
         pattern_title = f"{stock_name} - Double Top Pattern"
     else:
         # W shape: extend from left context to P1
@@ -905,10 +901,6 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
             y_points = [p1_price, t_price, p2_price, breakout_price]
         ax_price.scatter([p1_date, p2_date], [p1_price, p2_price], color=['green', 'green'], s=120, zorder=5, label='Double Bottom')
         ax_price.scatter([t_date], [t_price], color='red', s=100, zorder=5, label='Peak')
-        # Draw sharp W shape
-        ax_price.plot(x_points, y_points, color='crimson', linestyle='-', linewidth=2.5, alpha=0.95, label='W Shape')
-        # Join the two bottoms
-        ax_price.plot([p1_date, p2_date], [p1_price, p2_price], color='crimson', linestyle='-', linewidth=2.5, alpha=0.7)
         pattern_title = f"{stock_name} - Double Bottom Pattern"
 
     # Draw neckline (dotted)
