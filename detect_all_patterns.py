@@ -1010,6 +1010,18 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 pattern_type = pattern['type']
                 if pattern_counts[pattern_type] >= max_patterns_per_timeframe:
                     continue
+                
+                # Validate double pattern
+                try:
+                    from validator.validate_double_patterns import validate_double_pattern
+                except ImportError:
+                    validate_double_pattern = None
+                
+                # Add validation
+                if validate_double_pattern:
+                    validation = validate_double_pattern(df_slice, pattern)
+                    pattern['validation'] = validation
+                
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe
                 timeframe_patterns.append(pattern)
@@ -1087,6 +1099,15 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
         if hns_patterns_with_score:
             hns_score_log = Path(output_dir) / 'reports' / 'score' / 'hns' / f'{symbol}_hns_scores.csv'
             log_hns_scores(hns_patterns_with_score, hns_score_log)
+    except Exception:
+        pass
+    # Log Double Pattern scores if any (only if at least one has a score)
+    try:
+        from log.log_double_pattern_scores import log_double_pattern_scores
+        double_patterns_with_score = [p for p in all_results if p.get('type') in ['double_top', 'double_bottom'] and 'validation' in p]
+        if double_patterns_with_score:
+            double_score_log = Path(output_dir) / 'reports' / 'score' / 'double' / f'{symbol}_double_pattern_scores.csv'
+            log_double_pattern_scores(double_patterns_with_score, double_score_log)
     except Exception:
         pass
     return all_results
