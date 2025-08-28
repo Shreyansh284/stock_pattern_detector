@@ -20,6 +20,7 @@ Features:
 """
 
 import os
+import traceback
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -737,6 +738,7 @@ def plot_hns_pattern(df, pattern, stock_name, output_path):
     end_date = breakout_date + pd.Timedelta(days=30)
 
     df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    df_zoom = df_zoom.reset_index(drop=True)
     if df_zoom.empty:
         return
 
@@ -787,13 +789,19 @@ def plot_ch_pattern(df, pattern, stock_name, output_path):
     left_rim_date, left_rim_high, left_rim_idx = pattern['left_rim']
     cup_bottom_date, cup_bottom_low, cup_bottom_idx = pattern['cup_bottom']
     right_rim_date, right_rim_high, right_rim_idx = pattern['right_rim']
-    handle_date, handle_low, handle_low_idx = pattern['handle_low']
+    # Handle can be optional in some detections; fall back to right rim if missing
+    handle_tuple = pattern.get('handle_low')
+    if handle_tuple is None:
+        handle_date, handle_low, handle_low_idx = right_rim_date, right_rim_high, right_rim_idx
+    else:
+        handle_date, handle_low, handle_low_idx = handle_tuple
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
     start_date = left_rim_date - pd.Timedelta(days=30)
     end_date = breakout_date + pd.Timedelta(days=30)
 
     df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    df_zoom = df_zoom.reset_index(drop=True)
     if df_zoom.empty:
         return
 
@@ -963,6 +971,13 @@ def _plotly_volume_trace(df_zoom: pd.DataFrame):
     colors = np.where(df_zoom['Close'] >= df_zoom['Open'], '#16a34a', '#dc2626')
     return go.Bar(x=df_zoom['Date'], y=df_zoom['Volume'], name='Volume', marker_color=colors, opacity=0.6)
 
+def _smooth_series(y: pd.Series, window: int = 9, passes: int = 2) -> pd.Series:
+    """Lightweight smoothing without external deps. Centered moving-average applied in a few passes."""
+    ys = y.astype(float).copy()
+    for _ in range(max(1, passes)):
+        ys = ys.rolling(window=window, min_periods=1, center=True).mean()
+    return ys
+
 def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'):
     """Plot Head and Shoulders with Plotly, interactive with volume subplot and annotations."""
     if not _PLOTLY_AVAILABLE:
@@ -975,7 +990,26 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
     p3_date, p3_high, p3_idx = pattern['P3']
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
-    start_date = p1_date - pd.Timedelta(days=30)
+    # Determine a meaningful swing low before P1 for a nicer left leg and extend window
+    left_swing_date = None
+    left_swing_price = None
+    pre_seg = df[df['Date'] < p1_date]
+    if not pre_seg.empty:
+        pre_tail = pre_seg.tail(220).copy()
+        local_min_mask = (pre_tail['Low'] < pre_tail['Low'].shift(1)) & (pre_tail['Low'] <= pre_tail['Low'].shift(-1))
+        candidates = pre_tail[local_min_mask]
+        if not candidates.empty:
+            row = candidates.iloc[-1]
+        else:
+            row = pre_tail.loc[pre_tail['Low'].idxmin()]
+        left_swing_date = row['Date']
+        left_swing_price = float(row['Low'])
+
+    start_date_default = p1_date - pd.Timedelta(days=90)
+    if left_swing_date is not None:
+        start_date = min(left_swing_date - pd.Timedelta(days=5), start_date_default)
+    else:
+        start_date = start_date_default
     end_date = breakout_date + pd.Timedelta(days=30)
 
     df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
@@ -1100,22 +1134,74 @@ def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle')
     for tr in _plotly_price_traces(df_zoom, chart_type):
         fig.add_trace(tr, row=1, col=1)
 
+    # Neckline (resistance) across the whole window
     resistance_level = max(left_rim_high, right_rim_high)
     fig.add_trace(go.Scatter(x=[df_zoom['Date'].iloc[0], df_zoom['Date'].iloc[-1]],
                              y=[resistance_level, resistance_level], mode='lines',
-                             name='Resistance', line=dict(color='#7c3aed', dash='dash')), row=1, col=1)
+                             name='Neckline', line=dict(color='#334155', width=2)), row=1, col=1)
 
-    markers = [
-        (left_rim_date, left_rim_high, 'Left Rim', '#3b82f6'),
-        (cup_bottom_date, cup_bottom_low, 'Cup Bottom', '#ef4444'),
-        (right_rim_date, right_rim_high, 'Right Rim', '#3b82f6'),
-        (handle_date, handle_low, 'Handle', '#f59e0b'),
-        (breakout_date, breakout_price, 'Breakout', '#16a34a'),
+    # Smooth curved cup between left and right rims
+    cup_mask = (df_zoom['Date'] >= left_rim_date) & (df_zoom['Date'] <= right_rim_date)
+    cup_df = df_zoom.loc[cup_mask, ['Date', 'Low']].copy()
+    purple = '#7c3aed'
+    if len(cup_df) >= 3:
+        cup_df['curve'] = _smooth_series(cup_df['Low'], window=11, passes=3)
+        fig.add_trace(go.Scatter(x=cup_df['Date'], y=cup_df['curve'], mode='lines',
+                                 name='Cup', line=dict(color=purple, width=3)), row=1, col=1)
+        # Shade cup up to neckline
+        fig.add_trace(go.Scatter(x=list(cup_df['Date']) + list(reversed(cup_df['Date'])),
+                                 y=[resistance_level]*len(cup_df) + list(reversed(cup_df['curve'])),
+                                 mode='lines', fill='toself', name='Cup Area',
+                                 line=dict(color='rgba(124,58,237,0.4)'), fillcolor='rgba(124,58,237,0.18)',
+                                 showlegend=False), row=1, col=1)
+    else:
+        # Fallback to triangle-based cup from rims to bottom
+        cup_x = [left_rim_date, cup_bottom_date, right_rim_date]
+        cup_y = [left_rim_high, cup_bottom_low, right_rim_high]
+        fig.add_trace(go.Scatter(x=cup_x, y=cup_y, mode='lines', name='Cup',
+                                 line=dict(color=purple, width=3)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=cup_x + list(reversed(cup_x)),
+                                 y=[resistance_level]*3 + list(reversed(cup_y)),
+                                 mode='lines', fill='toself', name='Cup Area',
+                                 line=dict(color='rgba(124,58,237,0.4)'), fillcolor='rgba(124,58,237,0.18)',
+                                 showlegend=False), row=1, col=1)
+
+    # Handle: smooth small curve from right rim to handle low, then back to neckline
+    handle_mask = (df_zoom['Date'] >= right_rim_date) & (df_zoom['Date'] <= handle_date)
+    handle_df = df_zoom.loc[handle_mask, ['Date', 'Low']].copy()
+    if len(handle_df) >= 2:
+        handle_df['curve'] = _smooth_series(handle_df['Low'], window=7, passes=2)
+        fig.add_trace(go.Scatter(x=handle_df['Date'], y=handle_df['curve'], mode='lines',
+                                 name='Handle', line=dict(color=purple, width=3)), row=1, col=1)
+        # Shade handle to neckline
+        fig.add_trace(go.Scatter(x=list(handle_df['Date']) + list(reversed(handle_df['Date'])),
+                                 y=[resistance_level]*len(handle_df) + list(reversed(handle_df['curve'])),
+                                 mode='lines', fill='toself', name='Handle Area',
+                                 line=dict(color='rgba(124,58,237,0.4)'), fillcolor='rgba(124,58,237,0.18)',
+                                 showlegend=False), row=1, col=1)
+        # Handle baseline (flat)
+        baseline = float(np.nanmin(handle_df['curve']))
+        fig.add_trace(go.Scatter(x=[handle_df['Date'].iloc[0], handle_df['Date'].iloc[-1]],
+                                 y=[baseline, baseline], mode='lines',
+                                 name='Handle Base', line=dict(color='#334155', width=2)), row=1, col=1)
+
+    # Breakout horizontal extension from neckline to right edge and small upward arrow marker
+    fig.add_trace(go.Scatter(x=[right_rim_date, df_zoom['Date'].iloc[-1]],
+                             y=[resistance_level, resistance_level], mode='lines',
+                             name='Breakout Line', line=dict(color=purple, width=3)), row=1, col=1)
+    # Breakout marker and label
+    fig.add_trace(go.Scatter(x=[breakout_date], y=[resistance_level], mode='markers+text', name='Breakout',
+                             text=['Break Out Point'], textposition='top right',
+                             marker=dict(color=purple, size=8, symbol='diamond')), row=1, col=1)
+
+    # Key labels
+    label_pts = [
+        (left_rim_date, left_rim_high, 'CUP'),
+        (right_rim_date, right_rim_high, 'Neckline'),
     ]
-    for x, y, label, color in markers:
-        fig.add_trace(go.Scatter(x=[x], y=[y], mode='markers+text', name=label,
-                                 text=[label], textposition='top center',
-                                 marker=dict(color=color, size=10, symbol='circle')), row=1, col=1)
+    for x, y, txt in label_pts:
+        fig.add_trace(go.Scatter(x=[x], y=[y], mode='text', text=[txt], textposition='top center',
+                                 showlegend=False), row=1, col=1)
 
     fig.add_trace(_plotly_volume_trace(df_zoom), row=2, col=1)
 
@@ -1512,7 +1598,8 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                     
                     pattern['image_path'] = str(output_path)
                 except Exception as e:
-                    print(f"Failed to plot {pattern_type} for {symbol} {timeframe}: {e}")
+                    tb = ''.join(traceback.format_exception_only(type(e), e)).strip()
+                    print(f"Failed to plot {pattern_type} for {symbol} {timeframe}: {tb}")
                     pattern['image_path'] = None
         
         # Report results
