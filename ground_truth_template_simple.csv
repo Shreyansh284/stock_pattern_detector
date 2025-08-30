@@ -1,7 +1,0 @@
-symbol,timeframe,pattern_type,present
-AAPL,2y,double_top,1
-AAPL,3y,double_top,1
-MSFT,3y,cup_and_handle,1
-NVDA,2y,double_top,1
-MSFT,2y,cup_and_handle,0
-NVDA,3y,double_top,0
