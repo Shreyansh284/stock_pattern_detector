@@ -1668,6 +1668,8 @@ def save_results(results, output_file, mode):
     
     # Convert results to DataFrame format
     summary_records = []
+    # Maintain per (symbol,timeframe,pattern_type) counters to create stable instance_ids
+    instance_counters = {}
     
     for pattern in results:
         record = {
@@ -1676,6 +1678,11 @@ def save_results(results, output_file, mode):
             'timeframe': pattern['timeframe'],
             'mode': mode,
         }
+
+        # Build instance id (1-based incremental per symbol/timeframe/pattern_type)
+        key = (record['symbol'], record['timeframe'], record['pattern_type'])
+        instance_counters[key] = instance_counters.get(key, 0) + 1
+        record['instance_id'] = instance_counters[key]
         
         if pattern['type'] == 'head_and_shoulders':
             p1_date, p1_high, _ = pattern['P1']
@@ -1745,6 +1752,15 @@ def save_results(results, output_file, mode):
                 'image_path': pattern.get('image_path')
             })
         
+        # Add validation summary if present (consistent columns for metrics script)
+        validation = pattern.get('validation')
+        if isinstance(validation, dict):
+            record['validation_score'] = validation.get('score')
+            record['validation_is_valid'] = validation.get('is_valid')
+        else:
+            record['validation_score'] = None
+            record['validation_is_valid'] = None
+
         summary_records.append(record)
     
     # Save to CSV

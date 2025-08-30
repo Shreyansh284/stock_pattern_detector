@@ -38,7 +38,14 @@ Pending Confirmation Needed From You:
 Once you confirm A-C I can finalize or adjust logic.
 
 Usage (after confirmation):
-  python compute_metrics.py --detections outputs/reports/pattern_detection_all_strict_*.csv --ground-truth ground_truth.csv --mode simple
+    # Simple presence metrics per (symbol,timeframe,pattern_type)
+    python compute_metrics.py --detections outputs/reports/pattern_detection_all_strict_*.csv --ground-truth ground_truth.csv --mode simple
+
+    # Instance-level metrics (expects instance_id in ground truth CSV)
+    python compute_metrics.py --detections outputs/reports/pattern_detection_all_strict_*.csv --ground-truth ground_truth_instances.csv --mode instance
+
+    # Only count detections that passed internal validator
+    python compute_metrics.py --detections outputs/reports/pattern_detection_all_strict_*.csv --ground-truth ground_truth.csv --mode simple --valid-only
 
 Outputs:
   - Prints per pattern type metrics and overall macro + micro averages.
@@ -76,6 +83,11 @@ def load_detections(paths) -> pd.DataFrame:
     # unify to internal names
     mapping = {"hns": "head_and_shoulders", "hs": "head_and_shoulders"}
     det['pattern_type'] = det['pattern_type'].replace(mapping)
+    # Ensure optional columns exist
+    if 'instance_id' not in det.columns:
+        det['instance_id'] = 1
+    if 'validation_is_valid' not in det.columns:
+        det['validation_is_valid'] = True
     return det
 
 
@@ -135,6 +147,32 @@ def compute_confusion_simple(det: pd.DataFrame, gt: pd.DataFrame, treat_missing_
     return df_conf
 
 
+def compute_confusion_instance(det: pd.DataFrame, gt: pd.DataFrame) -> pd.DataFrame:
+    """Instance-level confusion: every ground-truth instance_id must be matched by a detection with same key & instance_id.
+    Detections with instance_id not in ground truth for that key count as FP.
+    Missing detections for a gt instance_id -> FN.
+    TN not meaningful at instance granularity (set 0)."""
+    req_cols = {'instance_id'}
+    if not req_cols.issubset(gt.columns):
+        raise SystemExit("Instance mode requires ground truth column 'instance_id'.")
+    records=[]
+    for key, group in gt.groupby(['symbol','timeframe','pattern_type']):
+        sym, tf, ptype = key
+        gt_ids = set(group['instance_id'].astype(str))
+        det_subset = det[(det.symbol==sym)&(det.timeframe==tf)&(det.pattern_type==ptype)]
+        det_ids = list(det_subset['instance_id'].astype(str))
+        matched = set()
+        for did in det_ids:
+            if did in gt_ids and did not in matched:
+                records.append({'symbol':sym,'timeframe':tf,'pattern_type':ptype,'instance_id':did,'TP':1,'FP':0,'FN':0,'TN':0})
+                matched.add(did)
+            else:
+                records.append({'symbol':sym,'timeframe':tf,'pattern_type':ptype,'instance_id':did,'TP':0,'FP':1,'FN':0,'TN':0})
+        for gid in gt_ids - matched:
+            records.append({'symbol':sym,'timeframe':tf,'pattern_type':ptype,'instance_id':gid,'TP':0,'FP':0,'FN':1,'TN':0})
+    return pd.DataFrame(records)
+
+
 def metrics_from_conf(df_conf: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str,float]]:
     rows=[]
     micro_tp=micro_fp=micro_fn=micro_tn=0
@@ -174,13 +212,20 @@ def main():
     parser.add_argument('--detections', nargs='+', required=True, help='Glob(s) for detection CSV(s)')
     parser.add_argument('--ground-truth', required=True, help='Ground truth CSV path')
     parser.add_argument('--treat-missing-as-negative', action='store_true', help='Treat keys missing in ground truth as negatives (TN)')
-    parser.add_argument('--over-detection-penalty', action='store_true', help='Count extra detections beyond first as FP when present=1')
+    parser.add_argument('--over-detection-penalty', action='store_true', help='Count extra detections beyond first as FP when present=1 (simple mode)')
+    parser.add_argument('--mode', choices=['simple','instance'], default='simple', help='Evaluation granularity')
+    parser.add_argument('--valid-only', action='store_true', help='Consider only detections with validation_is_valid == True')
     args = parser.parse_args()
 
     det = load_detections(args.detections)
+    if args.valid_only and 'validation_is_valid' in det.columns:
+        det = det[det['validation_is_valid']==True].copy()
     gt = load_ground_truth(args.ground_truth)
 
-    df_conf = compute_confusion_simple(det, gt, args.treat_missing_as_negative, args.over_detection_penalty)
+    if args.mode=='simple':
+        df_conf = compute_confusion_simple(det, gt, args.treat_missing_as_negative, args.over_detection_penalty)
+    else:
+        df_conf = compute_confusion_instance(det, gt)
     per_pattern, agg = metrics_from_conf(df_conf)
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
