@@ -93,10 +93,17 @@ def load_detections(paths) -> pd.DataFrame:
 
 def load_ground_truth(path: str) -> pd.DataFrame:
     gt = pd.read_csv(path)
-    req = ['symbol', 'timeframe', 'pattern_type', 'present']
-    missing = [c for c in req if c not in gt.columns]
-    if missing:
-        raise SystemExit(f"Ground truth file missing columns: {missing}")
+    base_req = ['symbol','timeframe','pattern_type']
+    missing_base = [c for c in base_req if c not in gt.columns]
+    if missing_base:
+        raise SystemExit(f"Ground truth file missing columns: {missing_base}")
+    # present column optional if instance_id supplied (instance mode) or if caller will treat missing as positives only
+    if 'present' not in gt.columns:
+        if 'instance_id' in gt.columns:
+            # assume all listed instances are present
+            gt['present'] = 1
+        else:
+            raise SystemExit("Ground truth missing 'present' column and no 'instance_id' provided.")
     gt['pattern_type'] = gt['pattern_type'].str.strip().str.lower()
     gt['present'] = gt['present'].astype(int)
     return gt
