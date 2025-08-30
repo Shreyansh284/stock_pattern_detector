@@ -1,0 +1,46 @@
+Section,Metric,Value
+Dataset Statistics,Total Symbol-Timeframe-Pattern Combinations,256
+Dataset Statistics,Total Patterns Detected,52
+Dataset Statistics,Unique Symbols Analyzed,16
+Dataset Statistics,Timeframes Analyzed,"['1y', '2y', '3y', '5y']"
+Dataset Statistics,Pattern Types,"['cup_and_handle', 'double_bottom', 'double_top', 'head_and_shoulders']"
+Confusion Matrix Totals,True Positives,43
+Confusion Matrix Totals,False Positives,0
+Confusion Matrix Totals,True Negatives,212
+Confusion Matrix Totals,False Negatives,1
+Overall Performance,Precision,1.0000
+Overall Performance,Recall,0.9773
+Overall Performance,Accuracy,0.9961
+Overall Performance,F1-Score,0.9885
+Head And Shoulders Performance,True Positives,0
+Head And Shoulders Performance,False Positives,0
+Head And Shoulders Performance,False Negatives,0
+Head And Shoulders Performance,True Negatives,64
+Head And Shoulders Performance,Precision,0.0000
+Head And Shoulders Performance,Recall,0.0000
+Head And Shoulders Performance,Accuracy,1.0000
+Head And Shoulders Performance,F1-Score,0.0000
+Cup And Handle Performance,True Positives,4
+Cup And Handle Performance,False Positives,0
+Cup And Handle Performance,False Negatives,0
+Cup And Handle Performance,True Negatives,60
+Cup And Handle Performance,Precision,1.0000
+Cup And Handle Performance,Recall,1.0000
+Cup And Handle Performance,Accuracy,1.0000
+Cup And Handle Performance,F1-Score,1.0000
+Double Top Performance,True Positives,22
+Double Top Performance,False Positives,0
+Double Top Performance,False Negatives,0
+Double Top Performance,True Negatives,42
+Double Top Performance,Precision,1.0000
+Double Top Performance,Recall,1.0000
+Double Top Performance,Accuracy,1.0000
+Double Top Performance,F1-Score,1.0000
+Double Bottom Performance,True Positives,17
+Double Bottom Performance,False Positives,0
+Double Bottom Performance,False Negatives,1
+Double Bottom Performance,True Negatives,46
+Double Bottom Performance,Precision,1.0000
+Double Bottom Performance,Recall,0.9444
+Double Bottom Performance,Accuracy,0.9844
+Double Bottom Performance,F1-Score,0.9714
