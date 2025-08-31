@@ -109,10 +109,16 @@ def detect_patterns(req: DetectRequest):
     start_date=req.start_date if using_date_range else None,
     end_date=req.end_date if using_date_range else None,
     )
+    # Return at most one chart per timeframe (e.g., summary)
     charts = []
+    seen_tf = set()
     for pattern in results:
         image_path = pattern.get('image_path')
         timeframe = pattern.get('timeframe', None)
+        # skip duplicates
+        if timeframe in seen_tf:
+            continue
+        seen_tf.add(timeframe)
         if image_path and image_path.endswith('.html') and os.path.exists(image_path):
             with open(image_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()

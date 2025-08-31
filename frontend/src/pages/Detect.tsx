@@ -21,20 +21,20 @@ export default function Detect() {
     const canRun = !!s.selectedStock && !!s.selectedPattern && !!s.selectedChartType && validDateRange &&
         (s.useDateRange ? (!!s.startDate && !!s.endDate) : !!s.selectedTimeframe)
 
-    const setPreset = useCallback((period: 'YTD'|'6M'|'1Y') => {
+    const setPreset = useCallback((period: 'YTD' | '6M' | '1Y') => {
         const today = new Date()
-        const end = today.toISOString().slice(0,10)
+        const end = today.toISOString().slice(0, 10)
         let start: string
         if (period === 'YTD') {
-            start = new Date(today.getFullYear(), 0, 1).toISOString().slice(0,10)
+            start = new Date(today.getFullYear(), 0, 1).toISOString().slice(0, 10)
         } else if (period === '6M') {
             const d = new Date(today)
             d.setMonth(d.getMonth() - 6)
-            start = d.toISOString().slice(0,10)
+            start = d.toISOString().slice(0, 10)
         } else {
             const d = new Date(today)
             d.setFullYear(d.getFullYear() - 1)
-            start = d.toISOString().slice(0,10)
+            start = d.toISOString().slice(0, 10)
         }
         s.setUseDateRange(true)
         s.setStartDate(start)
@@ -125,7 +125,7 @@ export default function Detect() {
                             ) : (
                                 <>
                                     <div className="flex gap-2 mb-2">
-                                        {['YTD','6M','1Y'].map(p => (
+                                        {['YTD', '6M', '1Y'].map(p => (
                                             <button
                                                 key={p}
                                                 type="button"
@@ -179,7 +179,7 @@ export default function Detect() {
                         </div>
                     )}
                     {s.loading ? (
-                        [1,2,3].map(i => (
+                        [1, 2, 3].map(i => (
                             <div key={i} className="border rounded-xl bg-white shadow-sm p-4 animate-pulse">
                                 <div className="h-4 bg-slate-200 rounded w-1/3 mb-4"></div>
                                 <div className="h-64 bg-slate-200 rounded"></div>
