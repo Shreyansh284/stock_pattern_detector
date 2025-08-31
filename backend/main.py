@@ -74,8 +74,14 @@ def detect_patterns(req: DetectRequest):
         "Head and Shoulders": "head_and_shoulders"
     }
     patterns = [pattern_map.get(req.pattern, req.pattern)]
-    # single timeframe now
-    timeframes = [req.timeframe.lower()]
+    # Determine whether using timeframe or custom date range
+    using_date_range = bool(req.start_date and req.end_date)
+    if using_date_range:
+        timeframes = ["custom"]
+    else:
+        if not req.timeframe:
+            return JSONResponse(status_code=400, content={"error": "Provide either timeframe or start_date+end_date"})
+        timeframes = [req.timeframe.lower()]
     results = process_symbol(
         symbol=req.stock,
         timeframes=timeframes,
@@ -90,7 +96,9 @@ def detect_patterns(req: DetectRequest):
         charts_subdir="charts",
         reports_subdir="reports",
         use_plotly=True,
-        chart_type=req.chart_type.lower() if req.chart_type else "candle",
+    chart_type=req.chart_type.lower() if req.chart_type else "candle",
+    start_date=req.start_date if using_date_range else None,
+    end_date=req.end_date if using_date_range else None,
     )
     charts = []
     for pattern in results:

@@ -5,8 +5,10 @@ export const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 export type DetectRequest = {
   stock: string
   pattern: string
-  timeframe: string
   chart_type: string
+  timeframe?: string
+  start_date?: string
+  end_date?: string
 }
 
 export type Chart = { timeframe: string; html: string }

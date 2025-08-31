@@ -17,7 +17,7 @@ export default function Detect() {
         if (!s.stocks.length) s.init()
     }, [])
 
-    const canRun = !!s.selectedStock && !!s.selectedPattern && !!s.selectedTimeframe && !!s.selectedChartType
+    const canRun = !!s.selectedStock && !!s.selectedPattern && !!s.selectedChartType && (s.useDateRange ? (!!s.startDate && !!s.endDate) : !!s.selectedTimeframe)
 
     return (
         <section className="max-w-7xl mx-auto p-6">
@@ -66,13 +66,30 @@ export default function Detect() {
                         </div>
 
                         <div className="p-4 space-y-4">
-                            <Select
-                                label="Timeframe"
-                                value={s.selectedTimeframe}
-                                onChange={s.setTimeframe}
-                                options={s.timeframes.map(v => ({ value: v }))}
-                                placeholder="Pick timeframe"
-                            />
+                            <div className="flex items-center gap-3">
+                                <input id="toggle-date" type="checkbox" className="h-4 w-4" checked={s.useDateRange} onChange={(e) => s.setUseDateRange(e.target.checked)} />
+                                <label htmlFor="toggle-date" className="text-sm text-slate-700">Use custom date range</label>
+                            </div>
+                            {!s.useDateRange ? (
+                                <Select
+                                    label="Timeframe"
+                                    value={s.selectedTimeframe}
+                                    onChange={s.setTimeframe}
+                                    options={s.timeframes.map(v => ({ value: v }))}
+                                    placeholder="Pick timeframe"
+                                />
+                            ) : (
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Start date</label>
+                                        <input type="date" className="w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400" value={s.startDate ?? ''} onChange={(e) => s.setStartDate(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">End date</label>
+                                        <input type="date" className="w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400" value={s.endDate ?? ''} onChange={(e) => s.setEndDate(e.target.value)} />
+                                    </div>
+                                </div>
+                            )}
                             <Select
                                 label="Chart type"
                                 value={s.selectedChartType}

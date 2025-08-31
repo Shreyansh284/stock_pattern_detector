@@ -10,6 +10,10 @@ type State = {
   selectedPattern?: string
   selectedTimeframe?: string
   selectedChartType?: string
+  // Date range mode
+  useDateRange: boolean
+  startDate?: string
+  endDate?: string
   charts: Chart[]
   loading: boolean
   error?: string
@@ -21,6 +25,9 @@ type Actions = {
   setPattern: (v?: string) => void
   setTimeframe: (v?: string) => void
   setChartType: (v?: string) => void
+  setUseDateRange: (v: boolean) => void
+  setStartDate: (v?: string) => void
+  setEndDate: (v?: string) => void
   runDetect: () => Promise<void>
   clearCharts: () => void
 }
@@ -32,6 +39,7 @@ export const useDetectStore = create<State & Actions>((set, get) => ({
   chartTypes: [],
   charts: [],
   loading: false,
+  useDateRange: false,
 
   init: async () => {
     set({ loading: true, error: undefined })
@@ -53,15 +61,32 @@ export const useDetectStore = create<State & Actions>((set, get) => ({
   setPattern: (v) => set({ selectedPattern: v }),
   setTimeframe: (v) => set({ selectedTimeframe: v }),
   setChartType: (v) => set({ selectedChartType: v }),
+  setUseDateRange: (v) => set({ useDateRange: v }),
+  setStartDate: (v) => set({ startDate: v }),
+  setEndDate: (v) => set({ endDate: v }),
   runDetect: async () => {
-    const { selectedStock, selectedPattern, selectedTimeframe, selectedChartType } = get()
-    if (!selectedStock || !selectedPattern || !selectedTimeframe || !selectedChartType) {
-      set({ error: 'Please select stock, pattern, timeframe and chart type.' })
+    const { selectedStock, selectedPattern, selectedTimeframe, selectedChartType, useDateRange, startDate, endDate } = get()
+    if (!selectedStock || !selectedPattern || !selectedChartType) {
+      set({ error: 'Please select stock, pattern and chart type.' })
       return
+    }
+    if (useDateRange) {
+      if (!startDate || !endDate) {
+        set({ error: 'Please select start and end date.' })
+        return
+      }
+    } else {
+      if (!selectedTimeframe) {
+        set({ error: 'Please select a timeframe or switch to date range.' })
+        return
+      }
     }
     set({ loading: true, error: undefined, charts: [] })
     try {
-  const res = await detect({ stock: selectedStock, pattern: selectedPattern, timeframe: selectedTimeframe, chart_type: selectedChartType })
+      const payload = useDateRange
+        ? { stock: selectedStock, pattern: selectedPattern, chart_type: selectedChartType, start_date: startDate, end_date: endDate }
+        : { stock: selectedStock, pattern: selectedPattern, chart_type: selectedChartType, timeframe: selectedTimeframe }
+      const res = await detect(payload as any)
   set({ charts: res.charts })
     } catch (e: any) {
       set({ error: e?.message ?? 'Detection failed' })
