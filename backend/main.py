@@ -34,6 +34,7 @@ AVAILABLE_PATTERNS = ["Double Top", "Double Bottom", "Cup and Handle", "Head and
 # Preserve order as defined in detect_all_patterns.TIMEFRAMES mapping
 AVAILABLE_TIMEFRAMES = list(TIMEFRAMES.keys())
 AVAILABLE_CHART_TYPES = ["candle", "line", "ohlc"]
+AVAILABLE_MODES = ["lenient", "strict"]
 
 @app.get("/stocks", response_model=List[str])
 def get_stocks():
@@ -65,6 +66,10 @@ def get_timeframes():
 def get_chart_types():
     return AVAILABLE_CHART_TYPES
 
+@app.get("/modes", response_model=List[str])
+def get_modes():
+    return AVAILABLE_MODES
+
 @app.post("/detect")
 def detect_patterns(req: DetectRequest):
     pattern_map = {
@@ -82,11 +87,15 @@ def detect_patterns(req: DetectRequest):
         if not req.timeframe:
             return JSONResponse(status_code=400, content={"error": "Provide either timeframe or start_date+end_date"})
         timeframes = [req.timeframe.lower()]
+    # pick mode (default lenient)
+    mode = req.mode.lower() if getattr(req, 'mode', None) else "lenient"
+    if mode not in AVAILABLE_MODES:
+        mode = "lenient"
     results = process_symbol(
         symbol=req.stock,
         timeframes=timeframes,
         patterns=patterns,
-        mode="lenient",
+        mode=mode,
         swing_method="rolling",
         output_dir="outputs",
         require_preceding_trend=True,

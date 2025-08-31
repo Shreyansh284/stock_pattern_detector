@@ -9,6 +9,7 @@ class DetectRequest(BaseModel):
     timeframe: Optional[str] = None
     start_date: Optional[str] = None  # YYYY-MM-DD
     end_date: Optional[str] = None    # YYYY-MM-DD
+    mode: Optional[str] = None        # 'lenient' | 'strict'
 
 class ChartResponse(BaseModel):
     timeframe: str

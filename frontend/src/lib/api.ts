@@ -9,6 +9,7 @@ export type DetectRequest = {
   timeframe?: string
   start_date?: string
   end_date?: string
+  mode?: string
 }
 
 export type Chart = { timeframe: string; html: string }
@@ -30,6 +31,11 @@ export async function fetchTimeframes() {
 
 export async function fetchChartTypes() {
   const { data } = await axios.get<string[]>(`${API_BASE}/chart-types`)
+  return data
+}
+
+export async function fetchModes() {
+  const { data } = await axios.get<string[]>(`${API_BASE}/modes`)
   return data
 }
 

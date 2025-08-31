@@ -65,6 +65,16 @@ export default function Detect() {
                             />
                         </div>
 
+                        <div className="p-4 border-b">
+                            <Select
+                                label="Mode"
+                                value={s.selectedMode}
+                                onChange={s.setMode}
+                                options={s.modes.map(v => ({ value: v }))}
+                                placeholder="Pick mode"
+                            />
+                        </div>
+
                         <div className="p-4 space-y-4">
                             <div className="flex items-center gap-3">
                                 <input id="toggle-date" type="checkbox" className="h-4 w-4" checked={s.useDateRange} onChange={(e) => s.setUseDateRange(e.target.checked)} />
