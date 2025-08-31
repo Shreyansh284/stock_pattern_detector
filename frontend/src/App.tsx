@@ -13,7 +13,7 @@ export default function App() {
                     </div>
                     <nav className="flex gap-4 text-sm">
                         <NavLink className={({ isActive }) => `px-3 py-2 rounded-md ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} to="/">Home</NavLink>
-                        <NavLink className={({ isActive }) => `px-3 py-2 rounded-md ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} to="/detect">Detect</NavLink>
+                        <NavLink className={({ isActive }) => `px-3 py-2 rounded-md ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} to="/detect">Detect Patterns</NavLink>
                     </nav>
                 </div>
             </header>
