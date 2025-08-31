@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { detect, fetchPatterns, fetchStocks, fetchTimeframes, fetchChartTypes, fetchModes, type Chart } from '../lib/api'
 
 type State = {
@@ -35,7 +36,9 @@ type Actions = {
   clearCharts: () => void
 }
 
-export const useDetectStore = create<State & Actions>((set, get) => ({
+export const useDetectStore = create<State & Actions>()(
+  persist(
+    (set, get) => ({
   stocks: [],
   patterns: [],
   timeframes: [],
@@ -102,4 +105,19 @@ export const useDetectStore = create<State & Actions>((set, get) => ({
     }
   },
   clearCharts: () => set({ charts: [] }),
-}))
+    }),
+    {
+      name: 'detect-store',
+      partialize: state => ({
+        selectedStock: state.selectedStock,
+        selectedPattern: state.selectedPattern,
+        selectedTimeframe: state.selectedTimeframe,
+        selectedChartType: state.selectedChartType,
+        selectedMode: state.selectedMode,
+        useDateRange: state.useDateRange,
+        startDate: state.startDate,
+        endDate: state.endDate,
+      }),
+    }
+  )
+)
