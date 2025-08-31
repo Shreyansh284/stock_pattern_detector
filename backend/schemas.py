@@ -4,7 +4,8 @@ from typing import List, Dict, Any
 class DetectRequest(BaseModel):
     stock: str
     pattern: str
-    timeframes: List[str]
+    timeframe: str
+    chart_type: str
 
 class ChartResponse(BaseModel):
     timeframe: str

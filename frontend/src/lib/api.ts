@@ -5,7 +5,8 @@ export const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 export type DetectRequest = {
   stock: string
   pattern: string
-  timeframes: string[]
+  timeframe: string
+  chart_type: string
 }
 
 export type Chart = { timeframe: string; html: string }
@@ -22,6 +23,11 @@ export async function fetchPatterns() {
 
 export async function fetchTimeframes() {
   const { data } = await axios.get<string[]>(`${API_BASE}/timeframes`)
+  return data
+}
+
+export async function fetchChartTypes() {
+  const { data } = await axios.get<string[]>(`${API_BASE}/chart-types`)
   return data
 }
 

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button'
 import Select from '../components/Select'
-import CheckboxGroup from '../components/CheckboxGroup'
 import HtmlPanel from '../components/HtmlPanel'
 import { useDetectStore } from '../store/useDetectStore'
 
@@ -18,7 +17,7 @@ export default function Detect() {
         if (!s.stocks.length) s.init()
     }, [])
 
-    const canRun = !!s.selectedStock && !!s.selectedPattern && s.selectedTimeframes.length > 0
+    const canRun = !!s.selectedStock && !!s.selectedPattern && !!s.selectedTimeframe && !!s.selectedChartType
 
     return (
         <section className="max-w-7xl mx-auto p-6">
@@ -66,12 +65,20 @@ export default function Detect() {
                             />
                         </div>
 
-                        <div className="p-4">
-                            <CheckboxGroup
-                                label="Timeframes"
-                                options={s.timeframes}
-                                values={s.selectedTimeframes}
-                                onToggle={s.toggleTimeframe}
+                        <div className="p-4 space-y-4">
+                            <Select
+                                label="Timeframe"
+                                value={s.selectedTimeframe}
+                                onChange={s.setTimeframe}
+                                options={s.timeframes.map(v => ({ value: v }))}
+                                placeholder="Pick timeframe"
+                            />
+                            <Select
+                                label="Chart type"
+                                value={s.selectedChartType}
+                                onChange={s.setChartType}
+                                options={s.chartTypes.map(v => ({ value: v }))}
+                                placeholder="Pick chart type"
                             />
                             <div className="mt-4">
                                 <Button disabled={!canRun || s.loading} onClick={s.runDetect}>
@@ -92,7 +99,7 @@ export default function Detect() {
 
                     {s.charts.length === 0 ? (
                         <div className="border rounded-xl bg-white shadow-sm p-10 text-center text-slate-500">
-                            Choose inputs on the left and click “Run Detection” to see charts here.
+                            No pattern detected or no charts available. Try other inputs.
                         </div>
                     ) : (
                         s.charts.map((c, idx) => (

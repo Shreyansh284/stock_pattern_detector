@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import DetectRequest
-from typing import List
+from typing import List, Dict
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from detect_all_patterns import process_symbol
+from detect_all_patterns import process_symbol, DEFAULT_SYMBOLS, TIMEFRAMES
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
@@ -18,13 +18,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-AVAILABLE_STOCKS = ["TCS.NS", "MARUTI.NS", "LT.NS", "ONGC.NS"]
-AVAILABLE_PATTERNS = ["Double Top", "Cup and Handle", "Head and Shoulders"]
-AVAILABLE_TIMEFRAMES = ["6m", "1y", "2y", "3y", "5y"]
+# Build a comprehensive stock list by flattening DEFAULT_SYMBOLS from detect_all_patterns
+def _flatten_symbols(symbol_groups: dict[str, list[str]]) -> list[str]:
+    seen = set()
+    flat: list[str] = []
+    for _, symbols in symbol_groups.items():
+        for s in symbols:
+            if s not in seen:
+                seen.add(s)
+                flat.append(s)
+    return flat
+
+AVAILABLE_STOCKS = _flatten_symbols(DEFAULT_SYMBOLS)
+AVAILABLE_PATTERNS = ["Double Top", "Double Bottom", "Cup and Handle", "Head and Shoulders"]
+# Preserve order as defined in detect_all_patterns.TIMEFRAMES mapping
+AVAILABLE_TIMEFRAMES = list(TIMEFRAMES.keys())
+AVAILABLE_CHART_TYPES = ["candle", "line", "ohlc"]
 
 @app.get("/stocks", response_model=List[str])
 def get_stocks():
     return AVAILABLE_STOCKS
+
+@app.get("/stock-groups", response_model=Dict[str, List[str]])
+def get_stock_groups():
+    # Return the original groups but ensure uniqueness and preserve ordering
+    groups: Dict[str, List[str]] = {}
+    for key, vals in DEFAULT_SYMBOLS.items():
+        seen = set()
+        ordered: List[str] = []
+        for s in vals:
+            if s not in seen:
+                seen.add(s)
+                ordered.append(s)
+        groups[str(key)] = ordered
+    return groups
 
 @app.get("/patterns", response_model=List[str])
 def get_patterns():
@@ -33,6 +60,10 @@ def get_patterns():
 @app.get("/timeframes", response_model=List[str])
 def get_timeframes():
     return AVAILABLE_TIMEFRAMES
+
+@app.get("/chart-types", response_model=List[str])
+def get_chart_types():
+    return AVAILABLE_CHART_TYPES
 
 @app.post("/detect")
 def detect_patterns(req: DetectRequest):
@@ -43,7 +74,8 @@ def detect_patterns(req: DetectRequest):
         "Head and Shoulders": "head_and_shoulders"
     }
     patterns = [pattern_map.get(req.pattern, req.pattern)]
-    timeframes = [tf.lower() for tf in req.timeframes]
+    # single timeframe now
+    timeframes = [req.timeframe.lower()]
     results = process_symbol(
         symbol=req.stock,
         timeframes=timeframes,
@@ -58,7 +90,7 @@ def detect_patterns(req: DetectRequest):
         charts_subdir="charts",
         reports_subdir="reports",
         use_plotly=True,
-        chart_type="candle"
+        chart_type=req.chart_type.lower() if req.chart_type else "candle",
     )
     charts = []
     for pattern in results:
