@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button'
 import Select from '../components/Select'
 import CheckboxGroup from '../components/CheckboxGroup'
@@ -7,6 +7,12 @@ import { useDetectStore } from '../store/useDetectStore'
 
 export default function Detect() {
     const s = useDetectStore()
+    const [q, setQ] = useState('')
+    const filteredStocks = useMemo(() => {
+        if (!q.trim()) return s.stocks
+        const qq = q.toLowerCase()
+        return s.stocks.filter(x => x.toLowerCase().includes(qq))
+    }, [q, s.stocks])
 
     useEffect(() => {
         if (!s.stocks.length) s.init()
@@ -15,49 +21,92 @@ export default function Detect() {
     const canRun = !!s.selectedStock && !!s.selectedPattern && s.selectedTimeframes.length > 0
 
     return (
-        <section className="max-w-6xl mx-auto p-4 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Select
-                    label="Stock"
-                    value={s.selectedStock}
-                    onChange={s.setStock}
-                    options={s.stocks.map(v => ({ value: v }))}
-                    placeholder="Pick a stock"
-                />
-                <Select
-                    label="Pattern"
-                    value={s.selectedPattern}
-                    onChange={s.setPattern}
-                    options={s.patterns.map(v => ({ value: v }))}
-                    placeholder="Pick a pattern"
-                />
-                <div className="flex items-end">
-                    <Button disabled={!canRun || s.loading} onClick={s.runDetect}>
-                        {s.loading ? 'Detecting…' : 'Run Detection'}
-                    </Button>
-                </div>
+        <section className="max-w-7xl mx-auto p-6">
+            <div className="mb-6">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Detect Chart Patterns</h1>
+                <p className="text-slate-600 mt-1">Pick a symbol, pattern and timeframes. We’ll render interactive charts inline.</p>
             </div>
 
-            <CheckboxGroup
-                label="Timeframes"
-                options={s.timeframes}
-                values={s.selectedTimeframes}
-                onToggle={s.toggleTimeframe}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Sidebar */}
+                <aside className="lg:col-span-1 space-y-4">
+                    <div className="rounded-xl border bg-white shadow-sm">
+                        <div className="p-4 border-b">
+                            <div className="text-sm font-medium text-slate-800">Symbol</div>
+                            <input
+                                type="text"
+                                placeholder="Search symbols…"
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                                className="mt-2 w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
+                            />
+                            <div className="mt-3 max-h-56 overflow-auto border rounded-md divide-y">
+                                {filteredStocks.map(sym => (
+                                    <button
+                                        key={sym}
+                                        className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${s.selectedStock === sym ? 'bg-slate-100 font-medium' : ''}`}
+                                        onClick={() => s.setStock(sym)}
+                                    >
+                                        {sym}
+                                    </button>
+                                ))}
+                                {filteredStocks.length === 0 && (
+                                    <div className="px-3 py-6 text-sm text-slate-500">No matches</div>
+                                )}
+                            </div>
+                        </div>
 
-            {s.error && (
-                <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
-                    {s.error}
-                </div>
-            )}
+                        <div className="p-4 border-b">
+                            <Select
+                                label="Pattern"
+                                value={s.selectedPattern}
+                                onChange={s.setPattern}
+                                options={s.patterns.map(v => ({ value: v }))}
+                                placeholder="Pick a pattern"
+                            />
+                        </div>
 
-            <div className="space-y-6">
-                {s.charts.map((c, idx) => (
-                    <div key={`${c.timeframe}-${idx}`} className="space-y-2">
-                        <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
-                        <HtmlPanel html={c.html} />
+                        <div className="p-4">
+                            <CheckboxGroup
+                                label="Timeframes"
+                                options={s.timeframes}
+                                values={s.selectedTimeframes}
+                                onToggle={s.toggleTimeframe}
+                            />
+                            <div className="mt-4">
+                                <Button disabled={!canRun || s.loading} onClick={s.runDetect}>
+                                    {s.loading ? 'Detecting…' : 'Run Detection'}
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                ))}
+                </aside>
+
+                {/* Content */}
+                <div className="lg:col-span-3 space-y-6">
+                    {s.error && (
+                        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+                            {s.error}
+                        </div>
+                    )}
+
+                    {s.charts.length === 0 ? (
+                        <div className="border rounded-xl bg-white shadow-sm p-10 text-center text-slate-500">
+                            Choose inputs on the left and click “Run Detection” to see charts here.
+                        </div>
+                    ) : (
+                        s.charts.map((c, idx) => (
+                            <div key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
+                                <div className="px-4 py-3 border-b flex items-center justify-between">
+                                    <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                                </div>
+                                <div className="p-4">
+                                    <HtmlPanel html={c.html} />
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
             </div>
         </section>
     )
