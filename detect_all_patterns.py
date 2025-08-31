@@ -1003,18 +1003,13 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
     fill_color = 'rgba(34, 197, 94, 0.18)'
 
     # Pre-context left leg into Left Shoulder, if we have data before P1 in the zoom window
-    if left_swing_date is not None:
-        fig.add_trace(go.Scatter(x=[left_swing_date, p1_date], y=[left_swing_price, p1_high],
+    pre_idx = df_zoom[df_zoom['Date'] < p1_date].index
+    if len(pre_idx) > 0:
+        left_date = df_zoom.loc[pre_idx[-1], 'Date']
+        left_price = df_zoom.loc[pre_idx[-1], 'Close']
+        fig.add_trace(go.Scatter(x=[left_date, p1_date], y=[left_price, p1_high],
                                  mode='lines', name='Left Leg',
                                  line=dict(color=line_color, width=2), showlegend=False), row=1, col=1)
-    else:
-        pre_idx = df_zoom[df_zoom['Date'] < p1_date].index
-        if len(pre_idx) > 0:
-            left_date = df_zoom.loc[pre_idx[-1], 'Date']
-            left_price = df_zoom.loc[pre_idx[-1], 'Close']
-            fig.add_trace(go.Scatter(x=[left_date, p1_date], y=[left_price, p1_high],
-                                     mode='lines', name='Left Leg',
-                                     line=dict(color=line_color, width=2), showlegend=False), row=1, col=1)
 
     # Main zigzag path P1 -> T1 -> P2 -> T2 -> P3
     outline_x = [p1_date, t1_date, p2_date, t2_date, p3_date]
@@ -1338,17 +1333,25 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
 def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir, 
                   require_preceding_trend, min_patterns, max_patterns_per_timeframe,
                   organize_by_date=False, charts_subdir='charts', reports_subdir='reports',
-                  use_plotly=False, chart_type='candle'):
+                  use_plotly=False, chart_type='candle',
+                  start_date: str | None = None, end_date: str | None = None):
     """Process a single symbol for pattern detection."""
     print(f"\nProcessing {symbol}...")
     
-    # Calculate date range (use the largest timeframe)
-    max_days = max(TIMEFRAMES[tf] for tf in timeframes)
-    start_date = (datetime.now() - timedelta(days=max_days + 365)).strftime('%Y-%m-%d')  # Extra buffer
-    end_date = datetime.now().strftime('%Y-%m-%d')
+    using_date_range = bool(start_date and end_date)
+    
+    # Calculate date range
+    if using_date_range:
+        start_date_dl = start_date
+        end_date_dl = end_date
+    else:
+        # Use the largest timeframe + buffer when no explicit date range
+        max_days = max(TIMEFRAMES[tf] for tf in timeframes)
+        start_date_dl = (datetime.now() - timedelta(days=max_days + 365)).strftime('%Y-%m-%d')
+        end_date_dl = datetime.now().strftime('%Y-%m-%d')
     
     try:
-        df = load_data(symbol, start_date, end_date)
+        df = load_data(symbol, start_date_dl, end_date_dl)
     except Exception as e:
         print(f"Failed to download {symbol}: {e}")
         return []
@@ -1366,24 +1369,35 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
     
     all_results = []
     
-    for timeframe in timeframes:
-        days = TIMEFRAMES[timeframe]
-        df_slice = df[df['Date'] >= df['Date'].max() - pd.Timedelta(days=days)].copy()
-        
+    # Determine iteration plan
+    if using_date_range:
+        # Single pass: use the explicit window
+        iter_plan = [(f"range_{start_date.replace('-','')}_to_{end_date.replace('-','')}", df[(df['Date'] >= pd.to_datetime(start_date)) & (df['Date'] <= pd.to_datetime(end_date))].copy())]
+    else:
+        iter_plan = []
+        for timeframe in timeframes:
+            days = TIMEFRAMES[timeframe]
+            df_slice = df[df['Date'] >= df['Date'].max() - pd.Timedelta(days=days)].copy()
+            iter_plan.append((timeframe, df_slice))
+
+    for timeframe_label, df_slice in iter_plan:
         if df_slice.empty:
-            print(f"{symbol} - {timeframe}: No data for this timeframe")
+            if using_date_range:
+                print(f"{symbol} - {start_date} to {end_date}: No data in this period")
+            else:
+                print(f"{symbol} - {timeframe_label}: No data for this timeframe")
             continue
 
         df_slice = df_slice.reset_index(drop=True)
-        
+
         # Generate swing points
         nbars = compute_dynamic_nbars(df_slice, base=GLOBAL_CONFIG['BASE_NBARS'])
         df_slice = generate_swing_flags(df_slice, method=swing_method, N_bars=nbars)
-        
+
         # Pattern detection
         timeframe_patterns = []
         pattern_counts = {'head_and_shoulders': 0, 'cup_and_handle': 0, 'double_top': 0, 'double_bottom': 0}
-        
+
         # Head and Shoulders
         if 'head_and_shoulders' in patterns:
             hns_patterns = detect_head_and_shoulders(df_slice, hns_config, require_preceding_trend)
@@ -1399,10 +1413,10 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                     validation = validate_hns(df_slice, pattern)
                     pattern['validation'] = validation
                 pattern['symbol'] = symbol
-                pattern['timeframe'] = timeframe
+                pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
                 pattern_counts['head_and_shoulders'] += 1
-        
+
         # Cup and Handle
         if 'cup_and_handle' in patterns:
             ch_patterns = detect_cup_and_handle(df_slice, ch_config, require_preceding_trend)
@@ -1419,10 +1433,10 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                     validation = validate_cup_handle(df_slice, pattern)
                     pattern['validation'] = validation
                 pattern['symbol'] = symbol
-                pattern['timeframe'] = timeframe
+                pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
                 pattern_counts['cup_and_handle'] += 1
-        
+
         # Double patterns
         if 'double_top' in patterns or 'double_bottom' in patterns:
             double_type = 'both'
@@ -1430,69 +1444,69 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 double_type = 'double_top'
             elif 'double_bottom' in patterns and 'double_top' not in patterns:
                 double_type = 'double_bottom'
-            
+
             double_patterns = detect_double_patterns(df_slice, dt_config, double_type, require_preceding_trend)
             for pattern in double_patterns:
                 pattern_type = pattern['type']
                 if pattern_counts[pattern_type] >= max_patterns_per_timeframe:
                     continue
-                
+
                 # Validate double pattern
                 try:
                     from validator.validate_double_patterns import validate_double_pattern
                 except ImportError:
                     validate_double_pattern = None
-                
+
                 # Add validation
                 if validate_double_pattern:
                     validation = validate_double_pattern(df_slice, pattern)
                     pattern['validation'] = validation
-                
+
                 pattern['symbol'] = symbol
-                pattern['timeframe'] = timeframe
+                pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
                 pattern_counts[pattern_type] += 1
-        
+
         # Create output directories and save charts
         if timeframe_patterns:
             for pattern in timeframe_patterns:
                 pattern_type = pattern['type']
-                
+
                 # Create organized folder structure
                 base_output = Path(output_dir)
-                
+
                 # Add date organization if requested
                 if organize_by_date:
                     date_str = datetime.now().strftime('%Y-%m-%d')
                     charts_base = base_output / date_str / charts_subdir
                 else:
                     charts_base = base_output / charts_subdir
-                
+
                 # Pattern type abbreviations for cleaner folder names
                 pattern_abbrev = {
                     'head_and_shoulders': 'HNS',
-                    'cup_and_handle': 'CH', 
+                    'cup_and_handle': 'CH',
                     'double_top': 'DT',
                     'double_bottom': 'DB'
                 }
-                
+
                 # Create nested structure:
                 # charts/symbol/timeframe/pattern_type/<backend>/[chart_type]
-                pattern_root = charts_base / symbol / timeframe / pattern_abbrev[pattern_type]
+                pattern_root = charts_base / symbol / timeframe_label / pattern_abbrev[pattern_type]
                 backend_dir = 'plotly' if use_plotly else 'matplotlib'
                 pattern_dir = pattern_root / backend_dir
                 if use_plotly:
                     pattern_dir = pattern_dir / (chart_type.lower() if chart_type else 'candle')
                 pattern_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 # Generate filename
                 pattern_count = pattern_counts[pattern_type]
                 if use_plotly:
-                    filename = f"{symbol}_{pattern_type.upper()}_{timeframe}_{pattern_count}.html"
+                    filename = f"{symbol}_{pattern_type.upper()}_{timeframe_label}_{pattern_count}.html"
                 else:
-                    filename = f"{symbol}_{pattern_type.upper()}_{timeframe}_{pattern_count}.png"
+                    filename = f"{symbol}_{pattern_type.upper()}_{timeframe_label}_{pattern_count}.png"
                 output_path = pattern_dir / filename
-                
+
                 # Plot pattern
                 try:
                     if use_plotly:
@@ -1509,20 +1523,20 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                             plot_ch_pattern(df_slice, pattern, symbol, str(output_path))
                         elif pattern_type in ['double_top', 'double_bottom']:
                             plot_double_pattern(df_slice, pattern, symbol, str(output_path))
-                    
+
                     pattern['image_path'] = str(output_path)
                 except Exception as e:
-                    print(f"Failed to plot {pattern_type} for {symbol} {timeframe}: {e}")
+                    print(f"Failed to plot {pattern_type} for {symbol} {timeframe_label}: {e}")
                     pattern['image_path'] = None
-        
+
         # Report results
         total_patterns = sum(pattern_counts.values())
         if total_patterns > 0:
             pattern_summary = ", ".join([f"{k}: {v}" for k, v in pattern_counts.items() if v > 0])
-            print(f"{symbol} - {timeframe}: {total_patterns} patterns detected ({pattern_summary})")
+            print(f"{symbol} - {timeframe_label}: {total_patterns} patterns detected ({pattern_summary})")
         else:
-            print(f"{symbol} - {timeframe}: No patterns detected")
-        
+            print(f"{symbol} - {timeframe_label}: No patterns detected")
+
         all_results.extend(timeframe_patterns)
     
     # Log Cup and Handle scores if any (only if at least one has a score)
@@ -1715,6 +1729,10 @@ Examples:
     # Timeframe selection
     parser.add_argument('--timeframes', type=str, default='6m,1y,2y,3y,5y',
                        help='Timeframes to analyze (comma-separated). Options: 1d,1w,2w,1m,2m,3m,6m,1y,2y,3y,5y')
+
+    # Custom date range (overrides timeframes when both provided)
+    parser.add_argument('--start-date', type=str, help='Custom start date YYYY-MM-DD')
+    parser.add_argument('--end-date', type=str, help='Custom end date YYYY-MM-DD')
     
     # Detection mode
     parser.add_argument('--mode', type=str, default='strict',
@@ -1813,12 +1831,28 @@ Examples:
                 print(f"Error: Invalid pattern '{pattern}'. Available: {', '.join(valid_patterns)}")
                 return
     
-    # Parse timeframes
-    timeframes = [tf.strip() for tf in args.timeframes.split(',')]
-    for tf in timeframes:
-        if tf not in TIMEFRAMES:
-            print(f"Error: Invalid timeframe '{tf}'. Available: {', '.join(TIMEFRAMES.keys())}")
+    # Parse timeframes or date range
+    start_date_arg = args.start_date
+    end_date_arg = args.end_date
+    using_date_range = bool(start_date_arg and end_date_arg)
+    if using_date_range:
+        # Quick validation
+        try:
+            _sd = datetime.strptime(start_date_arg, '%Y-%m-%d')
+            _ed = datetime.strptime(end_date_arg, '%Y-%m-%d')
+            if _sd >= _ed:
+                print('Error: --start-date must be earlier than --end-date')
+                return
+        except Exception:
+            print('Error: Dates must be in YYYY-MM-DD format')
             return
+        timeframes = ['custom']
+    else:
+        timeframes = [tf.strip() for tf in args.timeframes.split(',')]
+        for tf in timeframes:
+            if tf not in TIMEFRAMES:
+                print(f"Error: Invalid timeframe '{tf}'. Available: {', '.join(TIMEFRAMES.keys())}")
+                return
     
     # Parse modes
     if args.mode == 'both':
@@ -1830,7 +1864,10 @@ Examples:
         print("DRY RUN - Would process:")
         print(f"  Symbols: {len(symbols)} ({', '.join(symbols[:5])}{'...' if len(symbols) > 5 else ''})")
         print(f"  Patterns: {', '.join(patterns)}")
-        print(f"  Timeframes: {', '.join(timeframes)}")
+        if using_date_range:
+            print(f"  Date range: {start_date_arg} to {end_date_arg}")
+        else:
+            print(f"  Timeframes: {', '.join(timeframes)}")
         print(f"  Modes: {', '.join(modes)}")
         print(f"  Output structure:")
         if args.organize_by_date:
@@ -1870,6 +1907,8 @@ Examples:
                     reports_subdir=args.reports_subdir,
                     use_plotly=(args.plotly and _PLOTLY_AVAILABLE),
                     chart_type=args.chart_type,
+                    start_date=start_date_arg if using_date_range else None,
+                    end_date=end_date_arg if using_date_range else None,
                 )
                 all_results.extend(results)
 
