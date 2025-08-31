@@ -1,5 +1,6 @@
 # Ignore generated pattern chart images
 PatternCharts/
+evaluation_results/
 outputs/
 pattern_detection_summary.csv
 # Byte-compiled / cache
@@ -16,4 +17,6 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+
 
