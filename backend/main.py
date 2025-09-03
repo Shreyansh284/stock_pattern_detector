@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import DetectRequest
+from schemas import DetectRequest, DetectAllRequest, DetectAllResponse
 from typing import List, Dict
 import sys
 import os
+import yfinance as yf
+import pandas as pd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from detect_all_patterns import process_symbol, DEFAULT_SYMBOLS, TIMEFRAMES
 from fastapi.responses import JSONResponse
@@ -124,3 +126,94 @@ def detect_patterns(req: DetectRequest):
                 html_content = f.read()
             charts.append({"timeframe": timeframe, "html": html_content})
     return JSONResponse(content={"charts": charts})
+    
+@app.post("/detect-all", response_model=DetectAllResponse)
+def detect_all_stocks(req: DetectAllRequest):
+    # Validate date range
+    if req.start_date >= req.end_date:
+        return JSONResponse(status_code=400, content={"error": "start_date must be earlier than end_date"})
+    # Pattern mapping: snake -> human
+    pattern_map = {
+        'double_top': 'Double Top',
+        'double_bottom': 'Double Bottom',
+        'cup_and_handle': 'Cup and Handle',
+        'head_and_shoulders': 'Head and Shoulders',
+    }
+    # Run detection for each available stock
+    results = []
+    for stock in AVAILABLE_STOCKS:
+        # detect patterns for full set
+        raw = process_symbol(
+            symbol=stock,
+            timeframes=['custom'],
+            patterns=list(pattern_map.keys()),
+            mode='lenient',
+            swing_method='rolling',
+            output_dir='outputs',
+            require_preceding_trend=True,
+            min_patterns=1,
+            max_patterns_per_timeframe=5,
+            organize_by_date=False,
+            charts_subdir='charts',
+            reports_subdir='reports',
+            use_plotly=True,
+            chart_type='candle',
+            start_date=req.start_date,
+            end_date=req.end_date,
+        )
+        # Count patterns per type
+        types = [p.get('type') for p in raw if p.get('type')]
+        counts: Dict[str, int] = {}
+        for t in types:
+            counts[t] = counts.get(t, 0) + 1
+        # Human-readable pattern list
+        human_patterns = [pattern_map[t] for t in counts.keys()]
+        # Fetch latest price and volume
+        try:
+            ticker = yf.Ticker(stock)
+            # Get the most recent 2 days to ensure we have data
+            hist = ticker.history(period='2d')
+            if not hist.empty:
+                last = hist.iloc[-1]
+                current_price = float(last['Close']) if pd.notna(last['Close']) else 0.0
+                current_volume = int(last['Volume']) if pd.notna(last['Volume']) else 0
+            else:
+                # Fallback: try getting info from ticker
+                info = ticker.info
+                current_price = float(info.get('currentPrice', info.get('regularMarketPrice', 0.0)))
+                current_volume = int(info.get('volume', info.get('regularMarketVolume', 0)))
+        except Exception as e:
+            print(f"Failed to fetch price/volume for {stock}: {e}")
+            current_price = 0.0
+            current_volume = 0
+        # Build charts list including pattern label
+        # Build charts list including separate entries per pattern
+        charts = []
+        seen_pairs = set()
+        for p in raw:
+            tf = p.get('timeframe')
+            pat = p.get('type')
+            path = p.get('image_path')
+            key = (tf, pat)
+            if not tf or not pat or key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            if path and path.endswith('.html') and os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    html = f.read()
+                charts.append({
+                    'timeframe': tf,
+                    'pattern': pattern_map.get(pat, pat),
+                    'html': html
+                })
+        # Append stock result
+        results.append({
+            'stock': stock,
+            'patterns': human_patterns,
+            'pattern_counts': {pattern_map[k]: v for k, v in counts.items()},
+            'count': len(raw),
+            'current_price': current_price,
+            'current_volume': current_volume,
+            'charts': charts,
+        })
+    return DetectAllResponse(results=results)

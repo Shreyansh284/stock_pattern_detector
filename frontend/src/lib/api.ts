@@ -12,7 +12,7 @@ export type DetectRequest = {
   mode?: string
 }
 
-export type Chart = { timeframe: string; html: string }
+export type Chart = { timeframe: string; html: string; pattern?: string }
 
 export async function fetchStocks() {
   const { data } = await axios.get<string[]>(`${API_BASE}/stocks`)
@@ -41,5 +41,24 @@ export async function fetchModes() {
 
 export async function detect(req: DetectRequest) {
   const { data } = await axios.post<{ charts: Chart[] }>(`${API_BASE}/detect`, req)
+  return data
+}
+// Request & response types for detecting patterns across all stocks
+export type StockPatternResult = {
+  stock: string
+  patterns: string[]
+  pattern_counts: Record<string, number>
+  count: number
+  current_price: number
+  current_volume: number
+  charts: Array<Chart & { pattern: string }>
+}
+export type DetectAllRequest = { start_date: string; end_date: string }
+export type DetectAllResponse = { results: StockPatternResult[] }
+/**
+ * Run pattern detection across all stocks in a given date range.
+ */
+export async function detectAll(req: DetectAllRequest) {
+  const { data } = await axios.post<DetectAllResponse>(`${API_BASE}/detect-all`, req)
   return data
 }

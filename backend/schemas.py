@@ -17,3 +17,28 @@ class ChartResponse(BaseModel):
 
 class DetectResponse(BaseModel):
     charts: List[ChartResponse]
+    
+class DetectAllRequest(BaseModel):
+    """Request payload for running detection across all stocks."""
+    start_date: str  # YYYY-MM-DD
+    end_date: str    # YYYY-MM-DD
+
+class ChartHtml(BaseModel):
+    """HTML chart data for a specific timeframe."""
+    timeframe: str
+    pattern: str
+    html: str
+
+class StockPatternResult(BaseModel):
+    """Pattern detection result for a single stock."""
+    stock: str
+    patterns: List[str]
+    pattern_counts: Dict[str, int]
+    current_price: float
+    current_volume: int
+    count: int
+    charts: List[ChartHtml]
+
+class DetectAllResponse(BaseModel):
+    """Response containing detection results across all stocks."""
+    results: List[StockPatternResult]

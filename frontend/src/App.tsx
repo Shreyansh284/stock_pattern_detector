@@ -1,6 +1,7 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
 import Home from './pages/Home'
 import Detect from './pages/Detect'
+import Dashboard from './pages/Dashboard'
 
 export default function App() {
     return (
@@ -14,6 +15,7 @@ export default function App() {
                     <nav className="flex gap-4 text-sm">
                         <NavLink className={({ isActive }) => `px-3 py-2 rounded-md ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} to="/">Home</NavLink>
                         <NavLink className={({ isActive }) => `px-3 py-2 rounded-md ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} to="/detect">Detect Patterns</NavLink>
+                        <NavLink className={({ isActive }) => `px-3 py-2 rounded-md ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`} to="/dashboard">Dashboard</NavLink>
                     </nav>
                 </div>
             </header>
@@ -21,6 +23,7 @@ export default function App() {
                 <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/detect" element={<Detect />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                 </Routes>
             </main>
             <footer className="border-t py-6 text-center text-xs text-slate-500 bg-white">© {new Date().getFullYear()} Stock Pattern Detector</footer>
