@@ -954,8 +954,8 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
     if df_zoom.empty:
         return
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-                        row_heights=[0.72, 0.28])
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02,
+                        row_heights=[0.82, 0.18])
 
     for tr in _plotly_price_traces(df_zoom, chart_type):
         fig.add_trace(tr, row=1, col=1)
@@ -1034,6 +1034,7 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
         margin=dict(l=40, r=20, t=60, b=40),
         hovermode='x unified',
         showlegend=True,
+        height=980,
     )
     rs_visible = (chart_type or 'candle').lower() in ('candle', 'ohlc')
     fig.update_xaxes(showgrid=True, gridcolor='#e5e7eb', row=1, col=1, rangeslider_visible=rs_visible)
@@ -1041,7 +1042,7 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
     fig.update_yaxes(title_text='Volume', row=2, col=1)
     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
 
-    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True)
+    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True, config={'responsive': True})
 
 def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle'):
     """Plot Cup and Handle with Plotly."""
@@ -1059,8 +1060,8 @@ def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle')
     if df_zoom.empty:
         return
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-                        row_heights=[0.72, 0.28])
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02,
+                        row_heights=[0.82, 0.18])
 
     for tr in _plotly_price_traces(df_zoom, chart_type):
         fig.add_trace(tr, row=1, col=1)
@@ -1090,6 +1091,7 @@ def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle')
         margin=dict(l=40, r=20, t=60, b=40),
         hovermode='x unified',
         showlegend=True,
+        height=980,
     )
     rs_visible = (chart_type or 'candle').lower() in ('candle', 'ohlc')
     fig.update_xaxes(showgrid=True, gridcolor='#e5e7eb', row=1, col=1, rangeslider_visible=rs_visible)
@@ -1097,7 +1099,7 @@ def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle')
     fig.update_yaxes(title_text='Volume', row=2, col=1)
     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
 
-    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True)
+    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True, config={'responsive': True})
 
 def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='candle'):
     """Plot Double Top/Bottom with Plotly."""
@@ -1115,8 +1117,8 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
     if df_zoom.empty:
         return
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-                        row_heights=[0.72, 0.28])
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02,
+                        row_heights=[0.82, 0.18])
 
     for tr in _plotly_price_traces(df_zoom, chart_type):
         fig.add_trace(tr, row=1, col=1)
@@ -1286,6 +1288,7 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
         margin=dict(l=40, r=20, t=60, b=40),
         hovermode='x unified',
         showlegend=True,
+        height=980,
     )
     rs_visible = (chart_type or 'candle').lower() in ('candle', 'ohlc')
     fig.update_xaxes(showgrid=True, gridcolor='#e5e7eb', row=1, col=1, rangeslider_visible=rs_visible)
@@ -1293,7 +1296,7 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
     fig.update_yaxes(title_text='Volume', row=2, col=1)
     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
 
-    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True)
+    fig.write_html(output_path, include_plotlyjs='cdn', full_html=True, config={'responsive': True})
 # =============================================================================
 # MAIN PROCESSING FUNCTION
 # =============================================================================

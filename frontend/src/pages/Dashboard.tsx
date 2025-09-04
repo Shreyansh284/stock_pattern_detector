@@ -31,6 +31,50 @@ export default function Dashboard() {
     const itemsPerPage = 4
     const [pages, setPages] = useState<Record<string, number>>({})
 
+    // Simple skeletons
+    const SkeletonTable = () => (
+        <div className="bg-white border rounded-xl overflow-hidden animate-pulse">
+            <div className="h-10 bg-slate-100" />
+            <div className="divide-y">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="grid grid-cols-5 gap-4 px-4 py-3">
+                        <div className="h-4 bg-slate-200 rounded" />
+                        <div className="h-4 bg-slate-200 rounded" />
+                        <div className="h-4 bg-slate-200 rounded" />
+                        <div className="h-4 bg-slate-200 rounded" />
+                        <div className="h-4 bg-slate-200 rounded" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+
+    const SkeletonCharts = () => (
+        <div className="space-y-6">
+            {Array.from({ length: 2 }).map((_, c) => (
+                <div key={c} className="border rounded-xl bg-white shadow-sm">
+                    <div className="px-4 py-3 border-b flex items-center justify-between">
+                        <div className="h-4 w-48 bg-slate-200 rounded animate-pulse" />
+                        <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                    </div>
+                    <div className="p-4 space-y-4">
+                        {Array.from({ length: 2 }).map((_, i) => (
+                            <div key={i}>
+                                <div className="mb-2 h-3 w-64 bg-slate-200 rounded animate-pulse" />
+                                <div className="w-full h-[980px] bg-slate-100 rounded-lg border animate-pulse" />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="px-4 py-2 border-t flex justify-between">
+                        <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+                        <div className="h-4 w-24 bg-slate-200 rounded animate-pulse self-center" />
+                        <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+
     const runDetectAll = async () => {
         setError(null)
         if (!startDate || !endDate) {
@@ -156,7 +200,13 @@ export default function Dashboard() {
 
             {error && <div className="mb-4 text-red-600">{error}</div>}
 
-            {data && (
+            {loading && (
+                <>
+                    {activeTab === 'table' ? <SkeletonTable /> : <SkeletonCharts />}
+                </>
+            )}
+
+            {data && !loading && (
                 <>
                     <div className="flex items-center gap-4 mb-4">
                         <button
@@ -233,9 +283,7 @@ export default function Dashboard() {
                     ) : (
                         <div className="space-y-6">
                             {filterLoading ? (
-                                <div className="text-center py-8">
-                                    <div className="text-slate-500">Loading charts...</div>
-                                </div>
+                                <SkeletonCharts />
                             ) : (
                                 filteredResults.map(r => {
                                     if (!r || !r.charts || !Array.isArray(r.charts)) return null
