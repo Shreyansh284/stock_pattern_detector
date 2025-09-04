@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Button from '../components/Button'
 import Select from '../components/Select'
 import HtmlPanel from '../components/HtmlPanel'
-import { detectAll, fetchChartTypes, type Chart } from '../lib/api'
+import { detectAll, fetchChartTypes, type Chart, startDetectAll, getDetectAllProgress, getDetectAllResult } from '../lib/api'
 
 type StockPatternResult = {
     stock: string
@@ -32,6 +32,9 @@ export default function Dashboard() {
     const [pages, setPages] = useState<Record<string, number>>({})
     const [chartTypes, setChartTypes] = useState<string[]>(['candle', 'line', 'ohlc'])
     const [chartType, setChartType] = useState<string>('candle')
+    const [progress, setProgress] = useState<number>(0)
+    const [progressMsg, setProgressMsg] = useState<string>('')
+    const [jobId, setJobId] = useState<string | null>(null)
 
     useEffect(() => {
         // load available chart types from backend (optional)
@@ -93,15 +96,41 @@ export default function Dashboard() {
             return
         }
         setLoading(true)
+        setProgress(0)
+        setProgressMsg('Queued')
+        setData(null)
         try {
-            const res = await detectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any })
-            if (!res || !res.results) {
-                throw new Error('Invalid response from server')
-            }
+            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any })
+            setJobId(job_id)
+            // Poll progress
+            await new Promise<void>((resolve, reject) => {
+                const poll = async () => {
+                    try {
+                        const p = await getDetectAllProgress(job_id)
+                        setProgress(p.percent)
+                        setProgressMsg(p.message || `${p.current}/${p.total}`)
+                        if (p.status === 'done') {
+                            resolve()
+                            return
+                        }
+                        if (p.status === 'error') {
+                            reject(new Error(p.message || 'Error'))
+                            return
+                        }
+                        setTimeout(poll, 800)
+                    } catch (err: any) {
+                        reject(err)
+                    }
+                }
+                poll()
+            })
+            const res = await getDetectAllResult(job_id)
             setData(res)
+            setProgress(100)
+            setProgressMsg('Completed')
         } catch (e: any) {
             console.error('Detection error:', e)
-            setError(e?.response?.data?.error || e?.message || 'Detection failed')
+            setError(e?.response?.data?.detail || e?.message || 'Detection failed')
         } finally {
             setLoading(false)
         }
@@ -218,6 +247,17 @@ export default function Dashboard() {
 
             {loading && (
                 <>
+                    <div className="mb-4">
+                        <div className="rounded-lg bg-slate-800 text-white px-4 py-3 text-sm shadow">
+                            {progressMsg || 'Working...'}
+                        </div>
+                        <div className="mt-2 h-2 w-full rounded bg-slate-300 overflow-hidden">
+                            <div
+                                className="h-full rounded bg-blue-500 transition-all duration-300"
+                                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                            />
+                        </div>
+                    </div>
                     {activeTab === 'table' ? <SkeletonTable /> : <SkeletonCharts />}
                 </>
             )}

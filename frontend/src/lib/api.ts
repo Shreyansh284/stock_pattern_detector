@@ -62,3 +62,18 @@ export async function detectAll(req: DetectAllRequest) {
   const { data } = await axios.post<DetectAllResponse>(`${API_BASE}/detect-all`, req)
   return data
 }
+
+// Background job endpoints for accurate progress
+export async function startDetectAll(req: DetectAllRequest) {
+  const { data } = await axios.post<{ job_id: string }>(`${API_BASE}/detect-all-start`, req)
+  return data
+}
+export type DetectAllProgress = { status: string; current: number; total: number; symbol?: string; message?: string; percent: number }
+export async function getDetectAllProgress(job_id: string) {
+  const { data } = await axios.get<DetectAllProgress>(`${API_BASE}/detect-all-progress`, { params: { job_id } })
+  return data
+}
+export async function getDetectAllResult(job_id: string) {
+  const { data } = await axios.get<DetectAllResponse>(`${API_BASE}/detect-all-result`, { params: { job_id } })
+  return data
+}
