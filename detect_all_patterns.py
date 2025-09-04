@@ -713,30 +713,8 @@ def plot_hns_pattern(df, pattern, stock_name, output_path):
     p3_date, p3_high, p3_idx = pattern['P3']
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
-    # Find a meaningful swing low before the Left Shoulder to draw a longer left leg
-    left_swing_date = None
-    left_swing_price = None
-    pre_seg = df[df['Date'] < p1_date]
-    if not pre_seg.empty:
-        pre_tail = pre_seg.tail(220).copy()  # limit search window
-        local_min_mask = (pre_tail['Low'] < pre_tail['Low'].shift(1)) & (pre_tail['Low'] <= pre_tail['Low'].shift(-1))
-        candidates = pre_tail[local_min_mask]
-        if not candidates.empty:
-            row = candidates.iloc[-1]
-        else:
-            row = pre_tail.loc[pre_tail['Low'].idxmin()]
-        left_swing_date = row['Date']
-        left_swing_price = float(row['Low'])
-
-    # Extend the plotting window further left to include the swing low context
-    start_date_default = p1_date - pd.Timedelta(days=90)
-    if left_swing_date is not None:
-        start_date = min(left_swing_date - pd.Timedelta(days=5), start_date_default)
-    else:
-        start_date = start_date_default
-    end_date = breakout_date + pd.Timedelta(days=30)
-
-    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    # Display the entire available dataset window instead of zooming
+    df_zoom = df.copy()
     if df_zoom.empty:
         return
 
@@ -790,10 +768,8 @@ def plot_ch_pattern(df, pattern, stock_name, output_path):
     handle_date, handle_low, handle_low_idx = pattern['handle_low']
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
-    start_date = left_rim_date - pd.Timedelta(days=30)
-    end_date = breakout_date + pd.Timedelta(days=30)
-
-    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    # Display the entire available dataset window instead of zooming
+    df_zoom = df.copy()
     if df_zoom.empty:
         return
 
@@ -864,10 +840,8 @@ def plot_double_pattern(df, pattern, stock_name, output_path):
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
     neckline_level = pattern['neckline_level']
 
-    start_date = p1_date - pd.Timedelta(days=30)
-    end_date = breakout_date + pd.Timedelta(days=30)
-
-    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    # Display the entire available dataset window instead of zooming
+    df_zoom = df.copy()
     if df_zoom.empty:
         return
 
@@ -975,10 +949,8 @@ def plotly_hns_pattern(df, pattern, stock_name, output_path, chart_type='candle'
     p3_date, p3_high, p3_idx = pattern['P3']
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
-    start_date = p1_date - pd.Timedelta(days=30)
-    end_date = breakout_date + pd.Timedelta(days=30)
-
-    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    # Display the entire available dataset window instead of zooming
+    df_zoom = df.copy()
     if df_zoom.empty:
         return
 
@@ -1082,10 +1054,8 @@ def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle')
     handle_date, handle_low, handle_low_idx = pattern['handle_low']
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
 
-    start_date = left_rim_date - pd.Timedelta(days=30)
-    end_date = breakout_date + pd.Timedelta(days=30)
-
-    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    # Display the entire available dataset window instead of zooming
+    df_zoom = df.copy()
     if df_zoom.empty:
         return
 
@@ -1140,10 +1110,8 @@ def plotly_double_pattern(df, pattern, stock_name, output_path, chart_type='cand
     breakout_date, breakout_price, breakout_idx = pattern['breakout']
     neckline_level = pattern['neckline_level']
 
-    start_date = p1_date - pd.Timedelta(days=30)
-    end_date = breakout_date + pd.Timedelta(days=30)
-
-    df_zoom = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)].copy()
+    # Display the entire available dataset window instead of zooming
+    df_zoom = df.copy()
     if df_zoom.empty:
         return
 
