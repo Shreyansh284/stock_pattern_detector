@@ -22,6 +22,7 @@ class DetectAllRequest(BaseModel):
     """Request payload for running detection across all stocks."""
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
+    chart_type: Optional[str] = None  # 'candle' | 'line' | 'ohlc'
 
 class ChartHtml(BaseModel):
     """HTML chart data for a specific timeframe."""

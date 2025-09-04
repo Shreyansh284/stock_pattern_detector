@@ -157,7 +157,7 @@ def detect_all_stocks(req: DetectAllRequest):
             charts_subdir='charts',
             reports_subdir='reports',
             use_plotly=True,
-            chart_type='candle',
+            chart_type=(req.chart_type.lower() if getattr(req, 'chart_type', None) else 'candle'),
             start_date=req.start_date,
             end_date=req.end_date,
         )

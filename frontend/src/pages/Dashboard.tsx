@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Button from '../components/Button'
 import Select from '../components/Select'
 import HtmlPanel from '../components/HtmlPanel'
-import { detectAll, type Chart } from '../lib/api'
+import { detectAll, fetchChartTypes, type Chart } from '../lib/api'
 
 type StockPatternResult = {
     stock: string
@@ -30,6 +30,13 @@ export default function Dashboard() {
     const [stockFilter, setStockFilter] = useState<string | undefined>(undefined)
     const itemsPerPage = 4
     const [pages, setPages] = useState<Record<string, number>>({})
+    const [chartTypes, setChartTypes] = useState<string[]>(['candle', 'line', 'ohlc'])
+    const [chartType, setChartType] = useState<string>('candle')
+
+    useEffect(() => {
+        // load available chart types from backend (optional)
+        fetchChartTypes().then(setChartTypes).catch(() => { })
+    }, [])
 
     // Simple skeletons
     const SkeletonTable = () => (
@@ -87,7 +94,7 @@ export default function Dashboard() {
         }
         setLoading(true)
         try {
-            const res = await detectAll({ start_date: startDate, end_date: endDate })
+            const res = await detectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any })
             if (!res || !res.results) {
                 throw new Error('Invalid response from server')
             }
@@ -172,7 +179,7 @@ export default function Dashboard() {
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Pattern Detection Dashboard</h1>
                 <p className="text-slate-600 mt-1">Run detection across all stocks within a date range and explore results.</p>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
                     <input
@@ -189,6 +196,15 @@ export default function Dashboard() {
                         className="w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
                         value={endDate}
                         onChange={e => setEndDate(e.target.value)}
+                    />
+                </div>
+                <div>
+                    <Select
+                        label="Chart Type"
+                        value={chartType}
+                        onChange={(v) => setChartType(v ?? 'candle')}
+                        options={chartTypes.map(ct => ({ value: ct, label: ct.charAt(0).toUpperCase() + ct.slice(1) }))}
+                        placeholder="Candle"
                     />
                 </div>
                 <div className="flex items-end">
@@ -236,7 +252,7 @@ export default function Dashboard() {
                                 <Select
                                     label="Filter Stock"
                                     value={stockFilter}
-                                    onChange={setStockFilter}
+                                    onChange={(v) => setStockFilter(v)}
                                     options={results.map(r => ({ value: r.stock }))}
                                     placeholder="All stocks"
                                 />
