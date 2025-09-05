@@ -113,6 +113,7 @@ def detect_patterns(req: DetectRequest):
     chart_type=req.chart_type.lower() if req.chart_type else "candle",
     start_date=req.start_date if using_date_range else None,
     end_date=req.end_date if using_date_range else None,
+    keep_best_only=True,
     )
     # Return at most one chart per timeframe (e.g., summary)
     charts = []
@@ -175,6 +176,7 @@ def detect_all_stocks(req: DetectAllRequest):
             chart_type=(req.chart_type.lower() if getattr(req, 'chart_type', None) else 'candle'),
             start_date=req.start_date,
             end_date=req.end_date,
+            keep_best_only=True,
         )
         # Count patterns per type
         types = [p.get('type') for p in raw if p.get('type')]
@@ -291,6 +293,7 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 chart_type=(req.chart_type.lower() if getattr(req, 'chart_type', None) else 'candle'),
                 start_date=req.start_date,
                 end_date=req.end_date,
+                keep_best_only=True,
             )
             types = [p.get('type') for p in raw if p.get('type')]
             counts: Dict[str, int] = {}

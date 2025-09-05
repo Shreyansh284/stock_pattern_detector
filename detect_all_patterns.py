@@ -97,7 +97,7 @@ DT_CONFIG = {
         'NECKLINE_TOLERANCE': 0.015,
     },
     'lenient': {
-        'PEAK_SIMILARITY_TOL': 0.12,
+    'PEAK_SIMILARITY_TOL': 0.06,
         'MIN_PROMINENCE_PCT': 0.03,
         'MAX_SPACING_DAYS': 150,
         'MIN_SPACING_DAYS': 10,
@@ -1305,7 +1305,8 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                   require_preceding_trend, min_patterns, max_patterns_per_timeframe,
                   organize_by_date=False, charts_subdir='charts', reports_subdir='reports',
                   use_plotly=False, chart_type='candle',
-                  start_date: str | None = None, end_date: str | None = None):
+                  start_date: str | None = None, end_date: str | None = None,
+                  keep_best_only: bool = False):
     """Process a single symbol for pattern detection."""
     print(f"\nProcessing {symbol}...")
     
@@ -1365,7 +1366,7 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
         nbars = compute_dynamic_nbars(df_slice, base=GLOBAL_CONFIG['BASE_NBARS'])
         df_slice = generate_swing_flags(df_slice, method=swing_method, N_bars=nbars)
 
-        # Pattern detection
+    # Pattern detection
         timeframe_patterns = []
         pattern_counts = {'head_and_shoulders': 0, 'cup_and_handle': 0, 'double_top': 0, 'double_bottom': 0}
 
@@ -1374,10 +1375,11 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
             hns_patterns = detect_head_and_shoulders(df_slice, hns_config, require_preceding_trend)
             try:
                 from validator.validate_hns import validate_hns
-                from validator.explain_patterns import explain_pattern
+                from validator.explain_patterns import explain_pattern, compute_weighted_score
             except ImportError:
                 validate_hns = None
                 explain_pattern = None
+                compute_weighted_score = None
             for pattern in hns_patterns:
                 if pattern_counts['head_and_shoulders'] >= max_patterns_per_timeframe:
                     break
@@ -1392,6 +1394,14 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                             pattern['explanation'] = explain_pattern(df_slice, pattern)
                     except Exception:
                         pass
+                # weighted score
+                try:
+                    if compute_weighted_score and 'explanation' in pattern:
+                        ws, wmax = compute_weighted_score(pattern['explanation'])
+                        pattern['weighted_score'] = float(ws)
+                        pattern['weighted_max'] = float(wmax)
+                except Exception:
+                    pass
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
@@ -1403,10 +1413,11 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
             # Import validator
             try:
                 from validator.validate_cup_handle import validate_cup_handle
-                from validator.explain_patterns import explain_pattern
+                from validator.explain_patterns import explain_pattern, compute_weighted_score
             except ImportError:
                 validate_cup_handle = None
                 explain_pattern = None
+                compute_weighted_score = None
             for pattern in ch_patterns:
                 if pattern_counts['cup_and_handle'] >= max_patterns_per_timeframe:
                     break
@@ -1418,6 +1429,14 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 try:
                     if explain_pattern:
                         pattern['explanation'] = explain_pattern(df_slice, pattern)
+                except Exception:
+                    pass
+                # weighted score
+                try:
+                    if compute_weighted_score and 'explanation' in pattern:
+                        ws, wmax = compute_weighted_score(pattern['explanation'])
+                        pattern['weighted_score'] = float(ws)
+                        pattern['weighted_max'] = float(wmax)
                 except Exception:
                     pass
                 pattern['symbol'] = symbol
@@ -1442,10 +1461,11 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 # Validate double pattern
                 try:
                     from validator.validate_double_patterns import validate_double_pattern
-                    from validator.explain_patterns import explain_pattern
+                    from validator.explain_patterns import explain_pattern, compute_weighted_score
                 except ImportError:
                     validate_double_pattern = None
                     explain_pattern = None
+                    compute_weighted_score = None
 
                 # Add validation
                 if validate_double_pattern:
@@ -1457,11 +1477,44 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                         pattern['explanation'] = explain_pattern(df_slice, pattern)
                 except Exception:
                     pass
+                # weighted score
+                try:
+                    if compute_weighted_score and 'explanation' in pattern:
+                        ws, wmax = compute_weighted_score(pattern['explanation'])
+                        pattern['weighted_score'] = float(ws)
+                        pattern['weighted_max'] = float(wmax)
+                except Exception:
+                    pass
 
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
                 pattern_counts[pattern_type] += 1
+
+        # Optionally keep only the best pattern per timeframe to avoid overlap
+        if keep_best_only and timeframe_patterns:
+            def _priority_order(ptype: str) -> int:
+                # Prefer H&S over Double patterns over CH
+                if ptype == 'head_and_shoulders':
+                    return 0
+                if ptype in ('double_top', 'double_bottom'):
+                    return 1
+                if ptype == 'cup_and_handle':
+                    return 2
+                return 3
+
+            def _score_key(p: dict) -> tuple:
+                ws = float(p.get('weighted_score', 0.0))
+                # normalize by max if available
+                wmax = float(p.get('weighted_max', 1.0)) or 1.0
+                norm = ws / wmax
+                return (norm, -_priority_order(p.get('type', 'zzz')) * 1.0)
+
+            best = sorted(timeframe_patterns, key=_score_key, reverse=True)[0]
+            # adjust counts to reflect single kept pattern
+            pattern_counts = {'head_and_shoulders': 0, 'cup_and_handle': 0, 'double_top': 0, 'double_bottom': 0}
+            pattern_counts[best['type']] = 1
+            timeframe_patterns = [best]
 
         # Create output directories and save charts
         if timeframe_patterns:

@@ -512,7 +512,7 @@ def _explain_hns(df: pd.DataFrame, pattern: Dict[str, Any]) -> Dict[str, Any]:
 
     rules: List[RuleCheck] = []
     score = 0
-    max_score = 6  # head prominence, shoulder similarity, spacing, breakout close, volume, trend
+    max_score = 7  # head prominence, shoulder similarity, spacing, neckline slope, breakout close, volume, trend
 
     # 1) Head prominence above shoulders
     try:
@@ -560,6 +560,25 @@ def _explain_hns(df: pd.DataFrame, pattern: Dict[str, Any]) -> Dict[str, Any]:
         name="Shoulder spacing symmetry",
         value=_fmt_pct(time_asym) if time_asym is not None else "n/a",
         expected="|L−R|/max <= 35%",
+        passed=bool(passed)
+    ))
+
+    # 3b) Neckline slope sanity (<= ~45° absolute)
+    slope = pattern.get('neckline_slope')
+    intercept = pattern.get('neckline_intercept')
+    angle_deg = None
+    try:
+        if slope is not None:
+            angle_deg = abs(degrees(atan(float(slope))))
+    except Exception:
+        angle_deg = None
+    passed = (angle_deg is not None) and (angle_deg <= 45.0)
+    if passed:
+        score += 1
+    rules.append(RuleCheck(
+        name="Neckline slope",
+        value=(f"{angle_deg:.1f}°" if angle_deg is not None else "n/a"),
+    expected="|slope angle| <= 45°",
         passed=bool(passed)
     ))
 
@@ -664,3 +683,34 @@ def explain_pattern(df: pd.DataFrame, pattern: Dict[str, Any]) -> Dict[str, Any]
                 'target_price': None
             }
         }
+
+
+def compute_weighted_score(explanation: Dict[str, Any]) -> tuple[float, float]:
+    """Compute a weighted score from explanation rules.
+    Weights emphasize: trend strength, symmetry, volume confirmation, neckline slope (if present).
+    Returns (score, max_score).
+    """
+    rules = explanation.get('rules') or []
+    # map rule names -> weights
+    weights = {
+        'Preceding uptrend (60d)': 2.0,
+        'Preceding downtrend (60d)': 2.0,
+        'Shoulder spacing symmetry': 1.5,
+        'Cup symmetry (time)': 1.5,
+        'Top price similarity': 1.5,
+        'Bottom price similarity': 1.5,
+        'Volume spike on breakout': 2.0,
+        'Breakout close below neckline': 1.5,
+        'Breakout close above neckline': 1.5,
+        'Breakout close above resistance': 1.5,
+        'Neckline slope': 1.5,
+    }
+    score = 0.0
+    max_score = 0.0
+    for r in rules:
+        name = r.get('name')
+        w = float(weights.get(name, 1.0))
+        max_score += w
+        if bool(r.get('passed')):
+            score += w
+    return score, max_score
