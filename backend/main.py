@@ -42,6 +42,10 @@ AVAILABLE_TIMEFRAMES = list(TIMEFRAMES.keys())
 AVAILABLE_CHART_TYPES = ["candle", "line", "ohlc"]
 AVAILABLE_MODES = ["lenient", "strict"]
 
+# Simple in-memory cache for expensive endpoints (e.g., ticker tape)
+_TICKER_CACHE: dict[int, dict] = {}
+_TICKER_CACHE_TTL_SEC = 45  # serve cached result for this many seconds
+
 @app.get("/stocks", response_model=List[str])
 def get_stocks():
     return AVAILABLE_STOCKS
@@ -283,7 +287,7 @@ def detect_all_stocks(req: DetectAllRequest):
                     'explanation': explanation if explanation else None,
                 })
         # Append stock result
-    results.append({
+        results.append({
             'stock': stock,
             'patterns': human_patterns,
             'pattern_counts': {pattern_map[k]: v for k, v in counts.items()},
@@ -488,6 +492,11 @@ def ticker_tape(count: int = 20):
     Uses Yahoo Finance. Symbols come from AVAILABLE_STOCKS.
     """
     try:
+        # Serve from cache when fresh
+        now = time.time()
+        cached = _TICKER_CACHE.get(int(count))
+        if cached and (now - float(cached.get('ts', 0))) < _TICKER_CACHE_TTL_SEC:
+            return {'tickers': cached.get('items', [])[:count]}
         # Choose symbols deterministically for stability
         symbols = AVAILABLE_STOCKS[: max(1, min(50, count))]
         # Fetch last ~1.5 months to build a 20-point sparkline robustly
@@ -534,7 +543,9 @@ def ticker_tape(count: int = 20):
             except Exception:
                 continue
         # Ensure we only return up to `count` items
-        return {'tickers': items[:count]}
+        payload = items[:count]
+        _TICKER_CACHE[int(count)] = { 'ts': now, 'items': payload }
+        return {'tickers': payload}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

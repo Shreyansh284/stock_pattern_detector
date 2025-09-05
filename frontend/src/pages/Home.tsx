@@ -61,9 +61,22 @@ export default function Home() {
     const [loading, setLoading] = useState<boolean>(true)
     useEffect(() => {
         let mounted = true
+        const CACHE_KEY = 'ticker_tape_cache_v1'
+        const CACHE_TTL = 60_000 // 60s
+        // Try cache first for instant paint
+        try {
+            const raw = localStorage.getItem(CACHE_KEY)
+            if (raw) {
+                const cached = JSON.parse(raw) as { ts: number; items: TickerItem[] }
+                if (cached && Array.isArray(cached.items) && (Date.now() - cached.ts) < CACHE_TTL) {
+                    setTickers(cached.items)
+                    setLoading(false)
+                }
+            }
+        } catch {}
         const load = () => {
             fetchTickerTape(20)
-                .then((items) => { if (mounted) { setTickers(items); setLoading(false) } })
+                .then((items) => { if (mounted) { setTickers(items); setLoading(false); try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items })) } catch {} } })
                 .catch(() => {
                     // Fallback demo items
                     const fallback: TickerItem[] = [
@@ -72,10 +85,16 @@ export default function Home() {
                         { symbol: 'INFY.NS', display_symbol: 'INFY', price: 1682.1, change_pct: 1.12, volume: 0, avg_volume: 0, price_spike: true, volume_spike: false, sparkline: [80, 82, 84, 83, 85, 86, 88, 90, 92, 93] },
                         { symbol: 'HDFCBANK.NS', display_symbol: 'HDFCBANK', price: 1525.3, change_pct: 0.35, volume: 0, avg_volume: 0, price_spike: false, volume_spike: false, sparkline: [70, 69, 70, 71, 72, 73, 72, 74, 75, 76] },
                     ]
-                    if (mounted) { setTickers(fallback); setLoading(false) }
+                    if (mounted) { setTickers(fallback); setLoading(false); try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: fallback })) } catch {} }
                 })
         }
-        load()
+        // Only hit network immediately if cache is stale
+        try {
+            const raw = localStorage.getItem(CACHE_KEY)
+            const cached = raw ? (JSON.parse(raw) as { ts: number; items: TickerItem[] }) : null
+            const fresh = cached && (Date.now() - cached.ts) < CACHE_TTL
+            if (!fresh) load()
+        } catch { load() }
         const id = window.setInterval(load, 60000)
         return () => { mounted = false; window.clearInterval(id) }
     }, [])

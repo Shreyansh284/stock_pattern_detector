@@ -2,6 +2,19 @@ import axios from 'axios'
 
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 
+// Simple in-memory cache for static endpoints to avoid repeated round-trips
+type CacheEntry<T> = { ts: number; data: T }
+const _cache = new Map<string, CacheEntry<any>>()
+const TTL_STATIC = 5 * 60 * 1000 // 5 minutes
+function getCached<T>(key: string, ttl = TTL_STATIC): T | undefined {
+  const e = _cache.get(key)
+  if (e && (Date.now() - e.ts) < ttl) return e.data as T
+  return undefined
+}
+function setCached<T>(key: string, data: T) {
+  _cache.set(key, { ts: Date.now(), data })
+}
+
 export type DetectRequest = {
   stock: string
   pattern: string
@@ -17,27 +30,47 @@ export type DetectRequest = {
 export type Chart = { timeframe: string; html: string; pattern?: string; strength?: 'strong' | 'weak'; explanation?: any }
 
 export async function fetchStocks() {
+  const k = 'stocks'
+  const c = getCached<string[]>(k)
+  if (c) return c
   const { data } = await axios.get<string[]>(`${API_BASE}/stocks`)
+  setCached(k, data)
   return data
 }
 
 export async function fetchPatterns() {
+  const k = 'patterns'
+  const c = getCached<string[]>(k)
+  if (c) return c
   const { data } = await axios.get<string[]>(`${API_BASE}/patterns`)
+  setCached(k, data)
   return data
 }
 
 export async function fetchTimeframes() {
+  const k = 'timeframes'
+  const c = getCached<string[]>(k)
+  if (c) return c
   const { data } = await axios.get<string[]>(`${API_BASE}/timeframes`)
+  setCached(k, data)
   return data
 }
 
 export async function fetchChartTypes() {
+  const k = 'chart-types'
+  const c = getCached<string[]>(k)
+  if (c) return c
   const { data } = await axios.get<string[]>(`${API_BASE}/chart-types`)
+  setCached(k, data)
   return data
 }
 
 export async function fetchModes() {
+  const k = 'modes'
+  const c = getCached<string[]>(k)
+  if (c) return c
   const { data } = await axios.get<string[]>(`${API_BASE}/modes`)
+  setCached(k, data)
   return data
 }
 
