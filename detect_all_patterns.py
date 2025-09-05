@@ -200,6 +200,76 @@ def load_data(symbol, start_date, end_date):
         print(f"Error loading data for {symbol}: {e}")
         return None
 
+def load_data_from_csv(symbol: str, data_dir: str | os.PathLike) -> pd.DataFrame | None:
+    """Load stock data from a local CSV file.
+
+    Expects columns including Date, Open, High, Low, Close, Volume (Adj Close optional).
+    Will try to match filename case-insensitively and will also try stripping common suffixes
+    like '.NS' when looking for a matching CSV.
+    """
+    try:
+        base = symbol.strip()
+        # Try removing common Yahoo suffix
+        for suff in ('.NS', '.BS', '.L', '.HK', '.TO', '.AX'):
+            if base.upper().endswith(suff):
+                base = base[: -len(suff)]
+                break
+        # Candidate filenames to try
+        candidates = [f"{base}.csv", f"{base.upper()}.csv", f"{base.lower()}.csv"]
+        data_dir = str(data_dir)
+        # Build case-insensitive map of files in dir once
+        files = {}
+        try:
+            for fn in os.listdir(data_dir):
+                files[fn.lower()] = os.path.join(data_dir, fn)
+        except FileNotFoundError:
+            return None
+        path = None
+        for cand in candidates:
+            p = files.get(cand.lower())
+            if p:
+                path = p
+                break
+        if not path:
+            return None
+        df = pd.read_csv(path)
+        # Normalize columns
+        cols = {c.strip(): c for c in df.columns}
+        # Some csvs might have lowercase headers
+        def col(name: str):
+            for k in list(cols.keys()):
+                if k.lower() == name.lower():
+                    return cols[k]
+            return None
+        date_col = col('Date') or col('date')
+        open_col = col('Open') or col('open')
+        high_col = col('High') or col('high')
+        low_col = col('Low') or col('low')
+        close_col = col('Close') or col('close')
+        vol_col = col('Volume') or col('volume')
+        if not (date_col and open_col and high_col and low_col and close_col and vol_col):
+            return None
+        df = df.rename(columns={
+            date_col: 'Date',
+            open_col: 'Open',
+            high_col: 'High',
+            low_col: 'Low',
+            close_col: 'Close',
+            vol_col: 'Volume',
+        })
+        # Parse dates
+        try:
+            df['Date'] = pd.to_datetime(df['Date'])
+        except Exception:
+            # Try common formats fallback
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df = df[df['Date'].notna()]
+        # Ensure sorting
+        df = df.sort_values('Date').reset_index(drop=True)
+        return df
+    except Exception:
+        return None
+
 def find_swing_points(data, N_bars=20):
     """Find swing highs and lows using rolling windows."""
     data['is_swing_high'] = (data['High'] == data['High'].rolling(window=N_bars*2+1, center=True).max())
@@ -1306,7 +1376,9 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                   organize_by_date=False, charts_subdir='charts', reports_subdir='reports',
                   use_plotly=False, chart_type='candle',
                   start_date: str | None = None, end_date: str | None = None,
-                  keep_best_only: bool = False):
+                  keep_best_only: bool = False,
+                  data_source: str = 'live',
+                  stock_data_dir: str | None = None):
     """Process a single symbol for pattern detection."""
     print(f"\nProcessing {symbol}...")
     
@@ -1323,9 +1395,14 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
         end_date_dl = datetime.now().strftime('%Y-%m-%d')
     
     try:
-        df = load_data(symbol, start_date_dl, end_date_dl)
+        if (data_source or 'live').lower() == 'past':
+            # Load from CSV directory
+            ddir = stock_data_dir or os.environ.get('STOCK_DATA_DIR') or os.path.join(os.path.dirname(__file__), 'StockData')
+            df = load_data_from_csv(symbol, ddir)
+        else:
+            df = load_data(symbol, start_date_dl, end_date_dl)
     except Exception as e:
-        print(f"Failed to download {symbol}: {e}")
+        print(f"Failed to load data for {symbol}: {e}")
         return []
 
     if df is None or df.empty:

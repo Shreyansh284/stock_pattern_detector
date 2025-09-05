@@ -85,6 +85,16 @@ export default function Detect() {
 
                         <div className="p-4 border-b">
                             <Select
+                                label="Data Source"
+                                value={s.dataSource}
+                                onChange={(v) => s.setDataSource((v as any) ?? 'live')}
+                                options={[{ value: 'live', label: 'Live' }, { value: 'past', label: 'Past' }]}
+                                placeholder="Live"
+                            />
+                        </div>
+
+                        <div className="p-4 border-b">
+                            <Select
                                 label="Pattern"
                                 value={s.selectedPattern}
                                 onChange={s.setPattern}

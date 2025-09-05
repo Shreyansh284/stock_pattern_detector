@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import Button from '../components/Button'
 import Select from '../components/Select'
 import HtmlPanel from '../components/HtmlPanel'
 import { detectAll, fetchChartTypes, type Chart, startDetectAll, getDetectAllProgress, getDetectAllResult } from '../lib/api'
-import { useDashboardStore } from '../store/useDashboardStore'
 
 type StockPatternResult = {
     stock: string
@@ -20,17 +20,20 @@ type DetectAllResponse = {
 }
 
 export default function Dashboard() {
+    const location = useLocation()
+    const params = new URLSearchParams(location.search)
+    const initialSource = (params.get('source') as 'live' | 'past') || 'live'
+    const [source, setSource] = useState<'live' | 'past'>(initialSource)
     const [startDate, setStartDate] = useState<string>('')
     const [endDate, setEndDate] = useState<string>('')
-    const dash = useDashboardStore()
-    const [data, setData] = useState<DetectAllResponse | null>(dash.data)
+    const [data, setData] = useState<DetectAllResponse | null>(null)
     const [loading, setLoading] = useState(false)
     const [filterLoading, setFilterLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table')
-    const [patternFilter, setPatternFilter] = useState<string | undefined>(dash.patternFilter)
-    const [strengthFilter, setStrengthFilter] = useState<'all' | 'strong' | 'weak'>(dash.strengthFilter)
-    const [stockFilter, setStockFilter] = useState<string | undefined>(dash.stockFilter)
+    const [patternFilter, setPatternFilter] = useState<string | undefined>(undefined)
+    const [strengthFilter, setStrengthFilter] = useState<'all' | 'strong' | 'weak'>('all')
+    const [stockFilter, setStockFilter] = useState<string | undefined>(undefined)
     const itemsPerPage = 4
     const [pages, setPages] = useState<Record<string, number>>({})
     const [chartTypes, setChartTypes] = useState<string[]>(['candle', 'line', 'ohlc'])
@@ -101,9 +104,9 @@ export default function Dashboard() {
         setLoading(true)
         setProgress(0)
         setProgressMsg('Queued')
-    // Do not clear previous data until new result arrives; show progress bar
+        setData(null)
         try {
-            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any })
+            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any, data_source: source })
             setJobId(job_id)
             // Poll progress
             await new Promise<void>((resolve, reject) => {
@@ -129,7 +132,6 @@ export default function Dashboard() {
             })
             const res = await getDetectAllResult(job_id)
             setData(res)
-            dash.setData(res)
             setProgress(100)
             setProgressMsg('Completed')
         } catch (e: any) {
@@ -140,7 +142,7 @@ export default function Dashboard() {
         }
     }
 
-    const results = data?.results || dash.data?.results || []
+    const results = data?.results || []
 
     const availablePatterns = useMemo(() => {
         try {
@@ -229,9 +231,18 @@ export default function Dashboard() {
         <section className="max-w-7xl mx-auto p-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Pattern Detection Dashboard</h1>
-                <p className="text-slate-600 mt-1">Run detection across all stocks within a date range and explore results.</p>
+                <p className="text-slate-600 mt-1">Source: <span className="font-medium">{source === 'live' ? 'Live (Yahoo Finance)' : 'Past (CSV from STOCK_DATA)'}</span></p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+                <div>
+                    <Select
+                        label="Data Source"
+                        value={source}
+                        onChange={(v) => setSource((v as any) ?? 'live')}
+                        options={[{ value: 'live', label: 'Live' }, { value: 'past', label: 'Past' }]}
+                        placeholder="Live"
+                    />
+                </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
                     <input
@@ -308,21 +319,21 @@ export default function Dashboard() {
                                 <Select
                                     label="Filter Pattern"
                                     value={patternFilter}
-                                    onChange={(v) => { setPatternFilter(v); dash.setPatternFilter(v) }}
+                                    onChange={setPatternFilter}
                                     options={availablePatterns.map(p => ({ value: p }))}
                                     placeholder="All patterns"
                                 />
                                 <Select
                                     label="Filter Stock"
                                     value={stockFilter}
-                                    onChange={(v) => { setStockFilter(v); dash.setStockFilter(v) }}
+                                    onChange={(v) => setStockFilter(v)}
                                     options={results.map(r => ({ value: r.stock }))}
                                     placeholder="All stocks"
                                 />
                                 <Select
                                     label="Filter Strength"
                                     value={strengthFilter}
-                                    onChange={(v) => { const nv = (v as any) ?? 'all'; setStrengthFilter(nv); dash.setStrengthFilter(nv) }}
+                                    onChange={(v) => setStrengthFilter((v as any) ?? 'all')}
                                     options={[
                                         { value: 'all', label: 'All' },
                                         { value: 'strong', label: 'Strong only' },

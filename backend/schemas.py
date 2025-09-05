@@ -10,6 +10,8 @@ class DetectRequest(BaseModel):
     start_date: Optional[str] = None  # YYYY-MM-DD
     end_date: Optional[str] = None    # YYYY-MM-DD
     mode: Optional[str] = None        # 'lenient' | 'strict'
+    data_source: Optional[str] = None # 'live' | 'past'
+    stock_data_dir: Optional[str] = None
 
 class ChartResponse(BaseModel):
     timeframe: str
@@ -23,6 +25,8 @@ class DetectAllRequest(BaseModel):
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
     chart_type: Optional[str] = None  # 'candle' | 'line' | 'ohlc'
+    data_source: Optional[str] = None # 'live' | 'past'
+    stock_data_dir: Optional[str] = None
 
 class ChartHtml(BaseModel):
     """HTML chart data for a specific timeframe."""

@@ -10,6 +10,8 @@ export type DetectRequest = {
   start_date?: string
   end_date?: string
   mode?: string
+  data_source?: 'live' | 'past'
+  stock_data_dir?: string
 }
 
 export type Chart = { timeframe: string; html: string; pattern?: string; strength?: 'strong' | 'weak'; explanation?: any }
@@ -53,7 +55,7 @@ export type StockPatternResult = {
   current_volume: number
   charts: Array<Chart & { pattern: string }>
 }
-export type DetectAllRequest = { start_date: string; end_date: string; chart_type?: 'candle' | 'line' | 'ohlc' }
+export type DetectAllRequest = { start_date: string; end_date: string; chart_type?: 'candle' | 'line' | 'ohlc'; data_source?: 'live' | 'past'; stock_data_dir?: string }
 export type DetectAllResponse = { results: StockPatternResult[] }
 /**
  * Run pattern detection across all stocks in a given date range.

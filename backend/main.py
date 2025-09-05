@@ -96,6 +96,19 @@ def detect_patterns(req: DetectRequest):
     mode = req.mode.lower() if getattr(req, 'mode', None) else "lenient"
     if mode not in AVAILABLE_MODES:
         mode = "lenient"
+    # Choose data source
+    data_source = (getattr(req, 'data_source', None) or 'live').lower()
+    def _resolve_data_dir(explicit: str | None) -> str:
+        if explicit and os.path.isdir(explicit):
+            return explicit
+        env = os.environ.get('STOCK_DATA_DIR')
+        if env and os.path.isdir(env):
+            return env
+        root = os.path.dirname(os.path.dirname(__file__))
+        cand1 = os.path.join(root, 'StockData')
+        cand2 = os.path.join(root, 'STOCK_DATA')
+        return cand1 if os.path.isdir(cand1) else cand2
+    stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
     results = process_symbol(
         symbol=req.stock,
         timeframes=timeframes,
@@ -114,6 +127,8 @@ def detect_patterns(req: DetectRequest):
     start_date=req.start_date if using_date_range else None,
     end_date=req.end_date if using_date_range else None,
     keep_best_only=True,
+    data_source=data_source,
+    stock_data_dir=stock_data_dir,
     )
     # Return at most one chart per timeframe (e.g., summary)
     charts = []
@@ -157,7 +172,42 @@ def detect_all_stocks(req: DetectAllRequest):
     }
     # Run detection for each available stock
     results = []
-    for stock in AVAILABLE_STOCKS:
+    # Determine source for stock list and data
+    data_source = (getattr(req, 'data_source', None) or 'live').lower()
+    def _resolve_data_dir(explicit: str | None) -> str:
+        if explicit and os.path.isdir(explicit):
+            return explicit
+        env = os.environ.get('STOCK_DATA_DIR')
+        if env and os.path.isdir(env):
+            return env
+        root = os.path.dirname(os.path.dirname(__file__))
+        cand1 = os.path.join(root, 'StockData')
+        cand2 = os.path.join(root, 'STOCK_DATA')
+        return cand1 if os.path.isdir(cand1) else cand2
+    stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
+    # If past mode, derive stock list from CSV filenames
+    def list_csv_symbols(data_dir: str) -> list[str]:
+        syms: list[str] = []
+        try:
+            for fn in os.listdir(data_dir):
+                if fn.lower().endswith('.csv'):
+                    name = fn[:-4]
+                    syms.append(name)
+        except Exception:
+            pass
+        # Include with .NS suffix variants for convenience
+        uniq = []
+        seen = set()
+        for s in syms:
+            for variant in (s, f"{s}.NS"):
+                if variant not in seen:
+                    seen.add(variant)
+                    uniq.append(variant)
+        return uniq
+    stock_list = list_csv_symbols(stock_data_dir) if data_source == 'past' else AVAILABLE_STOCKS
+    if data_source == 'past' and len(stock_list) > 50:
+        stock_list = stock_list[:50]
+    for stock in stock_list:
         # detect patterns for full set
         raw = process_symbol(
             symbol=stock,
@@ -177,6 +227,8 @@ def detect_all_stocks(req: DetectAllRequest):
             start_date=req.start_date,
             end_date=req.end_date,
             keep_best_only=True,
+            data_source=data_source,
+            stock_data_dir=stock_data_dir,
         )
         # Count patterns per type
         types = [p.get('type') for p in raw if p.get('type')]
@@ -230,7 +282,7 @@ def detect_all_stocks(req: DetectAllRequest):
                     'explanation': explanation if explanation else None,
                 })
         # Append stock result
-        results.append({
+    results.append({
             'stock': stock,
             'patterns': human_patterns,
             'pattern_counts': {pattern_map[k]: v for k, v in counts.items()},
@@ -268,9 +320,42 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
             'head_and_shoulders': 'Head and Shoulders',
         }
 
+        # Determine source and stock list
+        data_source = (getattr(req, 'data_source', None) or 'live').lower()
+        def _resolve_data_dir(explicit: str | None) -> str:
+            if explicit and os.path.isdir(explicit):
+                return explicit
+            env = os.environ.get('STOCK_DATA_DIR')
+            if env and os.path.isdir(env):
+                return env
+            root = os.path.dirname(os.path.dirname(__file__))
+            cand1 = os.path.join(root, 'StockData')
+            cand2 = os.path.join(root, 'STOCK_DATA')
+            return cand1 if os.path.isdir(cand1) else cand2
+        stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
+        def list_csv_symbols(data_dir: str) -> list[str]:
+            syms: list[str] = []
+            try:
+                for fn in os.listdir(data_dir):
+                    if fn.lower().endswith('.csv'):
+                        name = fn[:-4]
+                        syms.append(name)
+            except Exception:
+                pass
+            uniq = []
+            seen = set()
+            for s in syms:
+                for variant in (s, f"{s}.NS"):
+                    if variant not in seen:
+                        seen.add(variant)
+                        uniq.append(variant)
+            return uniq
+        stock_list = list_csv_symbols(stock_data_dir) if data_source == 'past' else AVAILABLE_STOCKS
+        if data_source == 'past' and len(stock_list) > 50:
+            stock_list = stock_list[:50]
         results: List[Dict] = []
-        total = len(AVAILABLE_STOCKS)
-        for idx, stock in enumerate(AVAILABLE_STOCKS, start=1):
+        total = len(stock_list)
+        for idx, stock in enumerate(stock_list, start=1):
             PROGRESS[job_id].update({
                 'current': idx - 1,
                 'symbol': stock,
@@ -294,6 +379,8 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 start_date=req.start_date,
                 end_date=req.end_date,
                 keep_best_only=True,
+                data_source=data_source,
+                stock_data_dir=stock_data_dir,
             )
             types = [p.get('type') for p in raw if p.get('type')]
             counts: Dict[str, int] = {}
@@ -389,3 +476,24 @@ def detect_all_result(job_id: str):
     if not res:
         raise HTTPException(status_code=404, detail='Result not found')
     return res
+
+# Convenience endpoints explicitly matching the requirement wording
+@app.post('/detect/live')
+def detect_live(req: DetectRequest):
+    req.data_source = 'live'
+    return detect_patterns(req)
+
+@app.post('/detect/past')
+def detect_past(req: DetectRequest):
+    req.data_source = 'past'
+    return detect_patterns(req)
+
+@app.post('/detect-all-live')
+def detect_all_live(req: DetectAllRequest):
+    req.data_source = 'live'
+    return detect_all_stocks(req)
+
+@app.post('/detect-all-past')
+def detect_all_past(req: DetectAllRequest):
+    req.data_source = 'past'
+    return detect_all_stocks(req)

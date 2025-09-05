@@ -15,6 +15,7 @@ type State = {
   selectedMode?: string
   // Date range mode
   useDateRange: boolean
+  dataSource: 'live' | 'past'
   startDate?: string
   endDate?: string
   charts: Chart[]
@@ -34,6 +35,7 @@ type Actions = {
   setUseDateRange: (v: boolean) => void
   setStartDate: (v?: string) => void
   setEndDate: (v?: string) => void
+  setDataSource: (v: 'live' | 'past') => void
   runDetect: () => Promise<void>
   clearCharts: () => void
 }
@@ -51,6 +53,7 @@ export const useDetectStore = create<State & Actions>()(
   weakCharts: [],
   loading: false,
   useDateRange: false,
+  dataSource: 'live',
 
   init: async () => {
     set({ loading: true, error: undefined })
@@ -77,8 +80,9 @@ export const useDetectStore = create<State & Actions>()(
   setUseDateRange: (v) => set({ useDateRange: v }),
   setStartDate: (v) => set({ startDate: v }),
   setEndDate: (v) => set({ endDate: v }),
+  setDataSource: (v) => set({ dataSource: v }),
   runDetect: async () => {
-  const { selectedStock, selectedPattern, selectedTimeframe, selectedChartType, useDateRange, startDate, endDate, selectedMode } = get()
+  const { selectedStock, selectedPattern, selectedTimeframe, selectedChartType, useDateRange, startDate, endDate, selectedMode, dataSource } = get()
   if (!selectedStock || !selectedPattern || !selectedChartType || !selectedMode) {
       set({ error: 'Please select stock, pattern and chart type.' })
       return
@@ -96,7 +100,7 @@ export const useDetectStore = create<State & Actions>()(
     }
     set({ loading: true, error: undefined, charts: [] })
     try {
-      const base = { stock: selectedStock, pattern: selectedPattern, chart_type: selectedChartType, mode: selectedMode }
+  const base = { stock: selectedStock, pattern: selectedPattern, chart_type: selectedChartType, mode: selectedMode, data_source: dataSource }
       const payload = useDateRange
         ? { ...base, start_date: startDate, end_date: endDate }
         : { ...base, timeframe: selectedTimeframe }
