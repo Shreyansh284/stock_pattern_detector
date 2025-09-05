@@ -226,10 +226,10 @@ export default function Detect() {
                             {/* Fallback single list if grouping absent */}
                             {(!s.strongCharts?.length && !s.weakCharts?.length) && (
                                 s.charts.map((c, idx) => (
-                    <div key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
+                                    <div key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
                                         <div className="px-4 py-3 border-b flex items-center justify-between">
                                             <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
-                        <Button type="button" onClick={() => downloadChart(`chart-iframe-${idx}`)} className="text-sm">Download</Button>
+                                            <Button type="button" onClick={() => downloadChart(`chart-iframe-${idx}`)} className="text-sm">Download</Button>
                                         </div>
                                         <div className="p-4">
                                             <HtmlPanel html={c.html} id={`chart-iframe-${idx}`} />

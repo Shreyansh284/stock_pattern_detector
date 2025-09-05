@@ -3,6 +3,7 @@ import Button from '../components/Button'
 import Select from '../components/Select'
 import HtmlPanel from '../components/HtmlPanel'
 import { detectAll, fetchChartTypes, type Chart, startDetectAll, getDetectAllProgress, getDetectAllResult } from '../lib/api'
+import { useDashboardStore } from '../store/useDashboardStore'
 
 type StockPatternResult = {
     stock: string
@@ -21,14 +22,15 @@ type DetectAllResponse = {
 export default function Dashboard() {
     const [startDate, setStartDate] = useState<string>('')
     const [endDate, setEndDate] = useState<string>('')
-    const [data, setData] = useState<DetectAllResponse | null>(null)
+    const dash = useDashboardStore()
+    const [data, setData] = useState<DetectAllResponse | null>(dash.data)
     const [loading, setLoading] = useState(false)
     const [filterLoading, setFilterLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table')
-    const [patternFilter, setPatternFilter] = useState<string | undefined>(undefined)
-    const [strengthFilter, setStrengthFilter] = useState<'all' | 'strong' | 'weak'>('all')
-    const [stockFilter, setStockFilter] = useState<string | undefined>(undefined)
+    const [patternFilter, setPatternFilter] = useState<string | undefined>(dash.patternFilter)
+    const [strengthFilter, setStrengthFilter] = useState<'all' | 'strong' | 'weak'>(dash.strengthFilter)
+    const [stockFilter, setStockFilter] = useState<string | undefined>(dash.stockFilter)
     const itemsPerPage = 4
     const [pages, setPages] = useState<Record<string, number>>({})
     const [chartTypes, setChartTypes] = useState<string[]>(['candle', 'line', 'ohlc'])
@@ -99,7 +101,7 @@ export default function Dashboard() {
         setLoading(true)
         setProgress(0)
         setProgressMsg('Queued')
-        setData(null)
+    // Do not clear previous data until new result arrives; show progress bar
         try {
             const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any })
             setJobId(job_id)
@@ -127,6 +129,7 @@ export default function Dashboard() {
             })
             const res = await getDetectAllResult(job_id)
             setData(res)
+            dash.setData(res)
             setProgress(100)
             setProgressMsg('Completed')
         } catch (e: any) {
@@ -137,7 +140,7 @@ export default function Dashboard() {
         }
     }
 
-    const results = data?.results || []
+    const results = data?.results || dash.data?.results || []
 
     const availablePatterns = useMemo(() => {
         try {
@@ -305,21 +308,21 @@ export default function Dashboard() {
                                 <Select
                                     label="Filter Pattern"
                                     value={patternFilter}
-                                    onChange={setPatternFilter}
+                                    onChange={(v) => { setPatternFilter(v); dash.setPatternFilter(v) }}
                                     options={availablePatterns.map(p => ({ value: p }))}
                                     placeholder="All patterns"
                                 />
                                 <Select
                                     label="Filter Stock"
                                     value={stockFilter}
-                                    onChange={(v) => setStockFilter(v)}
+                                    onChange={(v) => { setStockFilter(v); dash.setStockFilter(v) }}
                                     options={results.map(r => ({ value: r.stock }))}
                                     placeholder="All stocks"
                                 />
                                 <Select
                                     label="Filter Strength"
                                     value={strengthFilter}
-                                    onChange={(v) => setStrengthFilter((v as any) ?? 'all')}
+                                    onChange={(v) => { const nv = (v as any) ?? 'all'; setStrengthFilter(nv); dash.setStrengthFilter(nv) }}
                                     options={[
                                         { value: 'all', label: 'All' },
                                         { value: 'strong', label: 'Strong only' },
@@ -388,14 +391,14 @@ export default function Dashboard() {
                                                 const byPattern: Record<string, { strong: number; weak: number; total: number }> = {}
                                                 if (Array.isArray(r.charts)) {
                                                     r.charts
-                                                      .filter((c: any) => (!patternFilter || c?.pattern === patternFilter) && (strengthFilter === 'all' || c?.strength === strengthFilter))
-                                                      .forEach((c: any) => {
-                                                        const pat = c?.pattern || 'Unknown'
-                                                        if (!byPattern[pat]) byPattern[pat] = { strong: 0, weak: 0, total: 0 }
-                                                        byPattern[pat].total += 1
-                                                        if (c?.strength === 'strong') byPattern[pat].strong += 1
-                                                        else if (c?.strength === 'weak') byPattern[pat].weak += 1
-                                                    })
+                                                        .filter((c: any) => (!patternFilter || c?.pattern === patternFilter) && (strengthFilter === 'all' || c?.strength === strengthFilter))
+                                                        .forEach((c: any) => {
+                                                            const pat = c?.pattern || 'Unknown'
+                                                            if (!byPattern[pat]) byPattern[pat] = { strong: 0, weak: 0, total: 0 }
+                                                            byPattern[pat].total += 1
+                                                            if (c?.strength === 'strong') byPattern[pat].strong += 1
+                                                            else if (c?.strength === 'weak') byPattern[pat].weak += 1
+                                                        })
                                                 }
                                                 const entries = Object.keys(byPattern)
                                                     .sort()
