@@ -126,7 +126,7 @@ def detect_patterns(req: DetectRequest):
     chart_type=req.chart_type.lower() if req.chart_type else "candle",
     start_date=req.start_date if using_date_range else None,
     end_date=req.end_date if using_date_range else None,
-    keep_best_only=True,
+    keep_best_only=(False if data_source == 'past' else True),
     data_source=data_source,
     stock_data_dir=stock_data_dir,
     )
@@ -226,7 +226,7 @@ def detect_all_stocks(req: DetectAllRequest):
             chart_type=(req.chart_type.lower() if getattr(req, 'chart_type', None) else 'candle'),
             start_date=req.start_date,
             end_date=req.end_date,
-            keep_best_only=True,
+            keep_best_only=(False if data_source == 'past' else True),
             data_source=data_source,
             stock_data_dir=stock_data_dir,
         )
@@ -378,7 +378,7 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 chart_type=(req.chart_type.lower() if getattr(req, 'chart_type', None) else 'candle'),
                 start_date=req.start_date,
                 end_date=req.end_date,
-                keep_best_only=True,
+                keep_best_only=(False if data_source == 'past' else True),
                 data_source=data_source,
                 stock_data_dir=stock_data_dir,
             )

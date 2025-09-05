@@ -240,7 +240,7 @@ export default function Dashboard() {
                         value={source}
                         onChange={(v) => setSource((v as any) ?? 'live')}
                         options={[{ value: 'live', label: 'Live' }, { value: 'past', label: 'Past' }]}
-                        placeholder="Live"
+                        placeholder="Select source"
                     />
                 </div>
                 <div>
@@ -249,6 +249,7 @@ export default function Dashboard() {
                         type="date"
                         className="w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
                         value={startDate}
+                        placeholder="dd-mm-yyyy"
                         onChange={e => setStartDate(e.target.value)}
                     />
                 </div>
@@ -258,6 +259,7 @@ export default function Dashboard() {
                         type="date"
                         className="w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
                         value={endDate}
+                        placeholder="dd-mm-yyyy"
                         onChange={e => setEndDate(e.target.value)}
                     />
                 </div>
