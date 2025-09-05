@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from uuid import uuid4
 import threading
 import time
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
@@ -476,6 +477,66 @@ def detect_all_result(job_id: str):
     if not res:
         raise HTTPException(status_code=404, detail='Result not found')
     return res
+
+# -----------------------------
+# Live ticker-tape endpoint (Home page)
+# -----------------------------
+
+@app.get('/ticker-tape')
+def ticker_tape(count: int = 20):
+    """Return up to `count` live tickers with price, change %, volume spike, and a small sparkline.
+    Uses Yahoo Finance. Symbols come from AVAILABLE_STOCKS.
+    """
+    try:
+        # Choose symbols deterministically for stability
+        symbols = AVAILABLE_STOCKS[: max(1, min(50, count))]
+        # Fetch last ~1.5 months to build a 20-point sparkline robustly
+        hist = yf.download(symbols, period='45d', interval='1d', group_by='ticker', progress=False, threads=True)
+        items = []
+        def _display(sym: str) -> str:
+            return sym[:-3] if sym.upper().endswith('.NS') else sym
+        for sym in symbols:
+            try:
+                # yfinance can return different shapes depending on single vs multi symbol
+                df = None
+                if isinstance(hist.columns, pd.MultiIndex):
+                    # group_by='ticker' -> columns level 0 is symbol
+                    if sym in hist.columns.get_level_values(0):
+                        df = hist[sym]
+                else:
+                    # Single-symbol dataframe
+                    df = hist
+                if df is None or df.empty:
+                    continue
+                df = df.dropna(subset=['Close'])
+                if df.empty:
+                    continue
+                closes = df['Close'].tail(20).tolist()
+                vols = df['Volume'].dropna()
+                last_close = float(df['Close'].iloc[-1]) if not df['Close'].empty else 0.0
+                prev_close = float(df['Close'].iloc[-2]) if len(df['Close']) > 1 else last_close
+                change_pct = ((last_close - prev_close) / prev_close * 100.0) if prev_close else 0.0
+                last_vol = int(vols.iloc[-1]) if not vols.empty else 0
+                avg_vol = float(vols.tail(20).mean()) if not vols.empty else 0.0
+                price_spike = abs(change_pct) >= 1.5
+                volume_spike = (avg_vol > 0 and last_vol >= avg_vol * 1.5)
+                items.append({
+                    'symbol': sym,
+                    'display_symbol': _display(sym),
+                    'price': round(last_close, 2),
+                    'change_pct': round(change_pct, 2),
+                    'volume': last_vol,
+                    'avg_volume': int(avg_vol) if avg_vol else 0,
+                    'price_spike': price_spike,
+                    'volume_spike': bool(volume_spike),
+                    'sparkline': closes,
+                })
+            except Exception:
+                continue
+        # Ensure we only return up to `count` items
+        return {'tickers': items[:count]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Convenience endpoints explicitly matching the requirement wording
 @app.post('/detect/live')

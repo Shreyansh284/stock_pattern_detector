@@ -79,3 +79,10 @@ export async function getDetectAllResult(job_id: string) {
   const { data } = await axios.get<DetectAllResponse>(`${API_BASE}/detect-all-result`, { params: { job_id } })
   return data
 }
+
+// Home ticker tape
+export type TickerItem = { symbol: string; display_symbol?: string; price: number; change_pct: number; volume: number; avg_volume: number; price_spike: boolean; volume_spike: boolean; sparkline: number[] }
+export async function fetchTickerTape(count = 20) {
+  const { data } = await axios.get<{ tickers: TickerItem[] }>(`${API_BASE}/ticker-tape`, { params: { count } })
+  return data.tickers
+}
