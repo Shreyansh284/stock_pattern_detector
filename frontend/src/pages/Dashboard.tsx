@@ -27,6 +27,7 @@ export default function Dashboard() {
     const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table')
     const [patternFilter, setPatternFilter] = useState<string | undefined>(undefined)
+    const [strengthFilter, setStrengthFilter] = useState<'all' | 'strong' | 'weak'>('all')
     const [stockFilter, setStockFilter] = useState<string | undefined>(undefined)
     const itemsPerPage = 4
     const [pages, setPages] = useState<Record<string, number>>({})
@@ -169,6 +170,25 @@ export default function Dashboard() {
         }
     }, [results, patternFilter, stockFilter])
 
+    // Aggregate counts by pattern across entire dataset (top summary)
+    const patternSummary = useMemo(() => {
+        const agg: Record<string, { total: number; strong: number; weak: number }> = {}
+        try {
+            results.forEach(r => {
+                (r.charts || []).forEach((c: any) => {
+                    const pat = c?.pattern || 'Unknown'
+                    if (!agg[pat]) agg[pat] = { total: 0, strong: 0, weak: 0 }
+                    agg[pat].total += 1
+                    if (c?.strength === 'strong') agg[pat].strong += 1
+                    else if (c?.strength === 'weak') agg[pat].weak += 1
+                })
+            })
+        } catch (e) {
+            console.error('Error computing pattern summary:', e)
+        }
+        return Object.entries(agg).sort(([a], [b]) => a.localeCompare(b))
+    }, [results])
+
     // Handle filter loading state separately
     useEffect(() => {
         setFilterLoading(true)
@@ -296,9 +316,37 @@ export default function Dashboard() {
                                     options={results.map(r => ({ value: r.stock }))}
                                     placeholder="All stocks"
                                 />
+                                <Select
+                                    label="Filter Strength"
+                                    value={strengthFilter}
+                                    onChange={(v) => setStrengthFilter((v as any) ?? 'all')}
+                                    options={[
+                                        { value: 'all', label: 'All' },
+                                        { value: 'strong', label: 'Strong only' },
+                                        { value: 'weak', label: 'Weak only' },
+                                    ]}
+                                    placeholder="All"
+                                />
                             </>
                         )}
                     </div>
+
+                    {/* Top summary: counts by pattern across entire dataset */}
+                    {patternSummary.length > 0 && (
+                        <div className="mb-4 p-4 border rounded-xl bg-white shadow-sm">
+                            <div className="text-sm font-semibold text-slate-700 mb-2">Summary by pattern (entire dataset)</div>
+                            <div className="flex flex-wrap gap-2">
+                                {patternSummary.map(([pat, v]) => (
+                                    <div key={pat} className="px-3 py-2 text-xs rounded-full border bg-slate-50">
+                                        <span className="font-medium">{pat}:</span>
+                                        <span className="ml-2">{v.total} total</span>
+                                        <span className="ml-2 text-green-700">{v.strong} strong</span>
+                                        <span className="ml-2 text-amber-700">{v.weak} weak</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {totalPatterns === 0 ? (
                         <div className="border rounded-xl bg-white shadow-sm p-10 text-center text-slate-500">
@@ -326,13 +374,22 @@ export default function Dashboard() {
                                         <td className="px-4 py-2 text-sm">
                                             {r.current_volume > 0 ? r.current_volume.toLocaleString() : 'N/A'}
                                         </td>
-                                        <td className="px-4 py-2 text-sm">{r.count}</td>
+                                        <td className="px-4 py-2 text-sm">{(() => {
+                                            // Count charts after applying pattern and strength filters
+                                            const charts = (r.charts || []).filter((c: any) =>
+                                                (!patternFilter || c?.pattern === patternFilter) &&
+                                                (strengthFilter === 'all' || c?.strength === strengthFilter)
+                                            )
+                                            return charts.length
+                                        })()}</td>
                                         <td className="px-4 py-2 text-sm">
                                             {r.count > 0 ? (() => {
                                                 // Build per-pattern strong/weak counts from charts; fall back to totals
                                                 const byPattern: Record<string, { strong: number; weak: number; total: number }> = {}
                                                 if (Array.isArray(r.charts)) {
-                                                    r.charts.forEach((c: any) => {
+                                                    r.charts
+                                                      .filter((c: any) => (!patternFilter || c?.pattern === patternFilter) && (strengthFilter === 'all' || c?.strength === strengthFilter))
+                                                      .forEach((c: any) => {
                                                         const pat = c?.pattern || 'Unknown'
                                                         if (!byPattern[pat]) byPattern[pat] = { strong: 0, weak: 0, total: 0 }
                                                         byPattern[pat].total += 1
@@ -356,8 +413,11 @@ export default function Dashboard() {
                                         <td className="px-4 py-2 text-sm">
                                             {/* strength counts per stock: derive from charts */}
                                             {Array.isArray(r.charts) && r.charts.length > 0 ? (() => {
-                                                const strong = r.charts.filter((c: any) => c?.strength === 'strong').length
-                                                const weak = r.charts.filter((c: any) => c?.strength === 'weak').length
+                                                const filtered = r.charts.filter((c: any) => (!patternFilter || c?.pattern === patternFilter) && (strengthFilter === 'all' || c?.strength === strengthFilter))
+                                                const strong = filtered.filter((c: any) => c?.strength === 'strong').length
+                                                const weak = filtered.filter((c: any) => c?.strength === 'weak').length
+                                                if (strengthFilter === 'strong') return `Strong: ${strong}`
+                                                if (strengthFilter === 'weak') return `Weak: ${weak}`
                                                 return strong + weak > 0 ? `Strong: ${strong}, Weak: ${weak}` : '—'
                                             })() : '—'}
                                         </td>
@@ -373,11 +433,10 @@ export default function Dashboard() {
                                 filteredResults.map(r => {
                                     if (!r || !r.charts || !Array.isArray(r.charts)) return null
 
-                                    // Filter charts by pattern if pattern filter is active
+                                    // Filter charts by pattern and strength if filters are active
                                     let chartsToFilter = r.charts
-                                    if (patternFilter) {
-                                        chartsToFilter = r.charts.filter(c => c.pattern === patternFilter)
-                                    }
+                                    if (patternFilter) chartsToFilter = chartsToFilter.filter(c => c.pattern === patternFilter)
+                                    if (strengthFilter !== 'all') chartsToFilter = chartsToFilter.filter(c => (c as any).strength === strengthFilter)
 
                                     // If no charts match the pattern filter, skip this stock
                                     if (chartsToFilter.length === 0) return null
