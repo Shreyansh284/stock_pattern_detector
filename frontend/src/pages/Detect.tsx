@@ -41,8 +41,8 @@ export default function Detect() {
         s.setEndDate(end)
     }, [s])
 
-    const downloadChart = useCallback(async (idx: number) => {
-        const iframe = document.getElementById(`chart-iframe-${idx}`) as HTMLIFrameElement | null
+    const downloadChart = useCallback(async (elementId: string) => {
+        const iframe = document.getElementById(elementId) as HTMLIFrameElement | null
         const win = iframe?.contentWindow as any
         if (win?.Plotly) {
             const plot = win.document.querySelector('.js-plotly-plot')
@@ -190,19 +190,54 @@ export default function Detect() {
                             No pattern detected or no charts available. Try other inputs.
                         </div>
                     ) : (
-                        s.charts.map((c, idx) => (
-                            <div key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
-                                <div className="px-4 py-3 border-b flex items-center justify-between">
-                                    <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
-                                    <Button type="button" onClick={() => downloadChart(idx)} className="text-sm">
-                                        Download
-                                    </Button>
+                        <>
+                            {Array.isArray(s.strongCharts) && s.strongCharts.length > 0 && (
+                                <div className="space-y-4">
+                                    <div className="text-sm font-semibold text-green-700">Strong patterns</div>
+                                    {s.strongCharts.map((c, idx) => (
+                                        <div key={`strong-${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
+                                            <div className="px-4 py-3 border-b flex items-center justify-between">
+                                                <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                                                <Button type="button" onClick={() => downloadChart(`chart-iframe-strong-${idx}`)} className="text-sm">Download</Button>
+                                            </div>
+                                            <div className="p-4">
+                                                <HtmlPanel html={c.html} id={`chart-iframe-strong-${idx}`} />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="p-4">
-                                    <HtmlPanel html={c.html} id={`chart-iframe-${idx}`} />
+                            )}
+                            {Array.isArray(s.weakCharts) && s.weakCharts.length > 0 && (
+                                <div className="space-y-4">
+                                    <div className="text-sm font-semibold text-amber-700">Weak patterns</div>
+                                    {s.weakCharts.map((c, idx) => (
+                                        <div key={`weak-${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
+                                            <div className="px-4 py-3 border-b flex items-center justify-between">
+                                                <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                                                <Button type="button" onClick={() => downloadChart(`chart-iframe-weak-${idx}`)} className="text-sm">Download</Button>
+                                            </div>
+                                            <div className="p-4">
+                                                <HtmlPanel html={c.html} id={`chart-iframe-weak-${idx}`} />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
-                        ))
+                            )}
+                            {/* Fallback single list if grouping absent */}
+                            {(!s.strongCharts?.length && !s.weakCharts?.length) && (
+                                s.charts.map((c, idx) => (
+                    <div key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
+                                        <div className="px-4 py-3 border-b flex items-center justify-between">
+                                            <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                        <Button type="button" onClick={() => downloadChart(`chart-iframe-${idx}`)} className="text-sm">Download</Button>
+                                        </div>
+                                        <div className="p-4">
+                                            <HtmlPanel html={c.html} id={`chart-iframe-${idx}`} />
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </>
                     )}
                 </div>
             </div>

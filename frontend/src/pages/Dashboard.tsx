@@ -313,6 +313,7 @@ export default function Dashboard() {
                                     <th className="px-4 py-2 text-left text-sm font-medium">Volume</th>
                                     <th className="px-4 py-2 text-left text-sm font-medium">Total Patterns</th>
                                     <th className="px-4 py-2 text-left text-sm font-medium">Pattern Counts</th>
+                                    <th className="px-4 py-2 text-left text-sm font-medium">Strength</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -327,10 +328,38 @@ export default function Dashboard() {
                                         </td>
                                         <td className="px-4 py-2 text-sm">{r.count}</td>
                                         <td className="px-4 py-2 text-sm">
-                                            {r.count > 0 ?
-                                                Object.entries(r.pattern_counts).map(([p, c]) => `${p}: ${c}`).join(', ') :
-                                                'No patterns detected'
-                                            }
+                                            {r.count > 0 ? (() => {
+                                                // Build per-pattern strong/weak counts from charts; fall back to totals
+                                                const byPattern: Record<string, { strong: number; weak: number; total: number }> = {}
+                                                if (Array.isArray(r.charts)) {
+                                                    r.charts.forEach((c: any) => {
+                                                        const pat = c?.pattern || 'Unknown'
+                                                        if (!byPattern[pat]) byPattern[pat] = { strong: 0, weak: 0, total: 0 }
+                                                        byPattern[pat].total += 1
+                                                        if (c?.strength === 'strong') byPattern[pat].strong += 1
+                                                        else if (c?.strength === 'weak') byPattern[pat].weak += 1
+                                                    })
+                                                }
+                                                const entries = Object.keys(byPattern)
+                                                    .sort()
+                                                    .map(k => {
+                                                        const v = byPattern[k]
+                                                        // If no strength info, just show total
+                                                        if (v.strong + v.weak === 0) return `${k}: ${v.total}`
+                                                        return `${k}: ${v.total} (${v.strong} strong / ${v.weak} weak)`
+                                                    })
+                                                return entries.length > 0
+                                                    ? entries.join(', ')
+                                                    : Object.entries(r.pattern_counts).map(([p, c]) => `${p}: ${c}`).join(', ')
+                                            })() : 'No patterns detected'}
+                                        </td>
+                                        <td className="px-4 py-2 text-sm">
+                                            {/* strength counts per stock: derive from charts */}
+                                            {Array.isArray(r.charts) && r.charts.length > 0 ? (() => {
+                                                const strong = r.charts.filter((c: any) => c?.strength === 'strong').length
+                                                const weak = r.charts.filter((c: any) => c?.strength === 'weak').length
+                                                return strong + weak > 0 ? `Strong: ${strong}, Weak: ${weak}` : '—'
+                                            })() : '—'}
                                         </td>
                                     </tr>
                                 ))}
@@ -369,12 +398,53 @@ export default function Dashboard() {
                                             <div className="p-4 space-y-4">
                                                 {chartsToShow.map((c, idx) => {
                                                     if (!c || !c.html) return null
+                                                    const exp = (c as any)?.explanation as any
+                                                    const rules: any[] = Array.isArray(exp?.rules) ? exp.rules : []
+                                                    const target = exp?.target
                                                     return (
-                                                        <div key={start + idx}>
+                                                        <div key={start + idx} className="border rounded-lg overflow-hidden">
                                                             <div className="mb-2 text-xs text-slate-500">
-                                                                Pattern: {c.pattern || 'Unknown'} | Timeframe: {c.timeframe || 'Unknown'}
+                                                                Pattern: {c.pattern || 'Unknown'} | Timeframe: {c.timeframe || 'Unknown'}{c && (c as any).strength ? ` | Strength: ${(c as any).strength}` : ''}
                                                             </div>
                                                             <HtmlPanel html={c.html} id={`dash-chart-${r.stock}-${start + idx}`} />
+                                                            {(exp && (rules.length > 0 || target)) && (
+                                                                <details className="bg-slate-50 border-t">
+                                                                    <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-slate-700 select-none">Details</summary>
+                                                                    <div className="px-4 pb-4 pt-1 grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                                                                        <div>
+                                                                            <div className="font-semibold mb-2">Validation rules</div>
+                                                                            <ul className="space-y-1 list-disc list-inside">
+                                                                                {rules.map((rul: any, i: number) => (
+                                                                                    <li key={i} className={rul.passed ? 'text-green-700' : 'text-amber-700'}>
+                                                                                        {rul.name}: <span className="font-mono">{rul.value}</span> (expected {rul.expected})
+                                                                                        {rul.notes ? <span className="text-slate-500"> — {rul.notes}</span> : null}
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="font-semibold mb-2">Target calculation</div>
+                                                                            {target ? (
+                                                                                <div>
+                                                                                    <div className="text-slate-700 mb-1">{target.formula}</div>
+                                                                                    {Array.isArray(target.steps) && target.steps.length > 0 && (
+                                                                                        <ol className="list-decimal list-inside space-y-1">
+                                                                                            {target.steps.map((s: string, i: number) => (
+                                                                                                <li key={i} className="font-mono text-slate-700">{s}</li>
+                                                                                            ))}
+                                                                                        </ol>
+                                                                                    )}
+                                                                                    {typeof target.target_price === 'number' && (
+                                                                                        <div className="mt-2 text-sm font-medium">Target price: <span className="font-mono">{target.target_price.toFixed(2)}</span></div>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="text-slate-500">No target available</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </details>
+                                                            )}
                                                         </div>
                                                     )
                                                 })}

@@ -18,6 +18,8 @@ type State = {
   startDate?: string
   endDate?: string
   charts: Chart[]
+  strongCharts?: Chart[]
+  weakCharts?: Chart[]
   loading: boolean
   error?: string
 }
@@ -45,6 +47,8 @@ export const useDetectStore = create<State & Actions>()(
   chartTypes: [],
   modes: [],
   charts: [],
+  strongCharts: [],
+  weakCharts: [],
   loading: false,
   useDateRange: false,
 
@@ -96,8 +100,10 @@ export const useDetectStore = create<State & Actions>()(
       const payload = useDateRange
         ? { ...base, start_date: startDate, end_date: endDate }
         : { ...base, timeframe: selectedTimeframe }
-      const res = await detect(payload as any)
-  set({ charts: res.charts })
+  const res = await detect(payload as any)
+  const strong = res.strong_charts ?? res.charts?.filter(c => c.strength === 'strong') ?? []
+  const weak = res.weak_charts ?? res.charts?.filter(c => c.strength === 'weak') ?? []
+  set({ charts: res.charts, strongCharts: strong, weakCharts: weak })
     } catch (e: any) {
       set({ error: e?.message ?? 'Detection failed' })
     } finally {

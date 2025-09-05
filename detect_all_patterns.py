@@ -132,8 +132,8 @@ DEFAULT_SYMBOLS = {
     'indian_banking': [
         'HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS', 'AXISBANK.NS', 'KOTAKBANK.NS',
         'BANKBARODA.NS', 'INDUSINDBK.NS', 'FEDERALBNK.NS', 'IDFCFIRSTB.NS'
-    ],
-    'crypto': ['BTC-USD', 'ETH-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'SOL-USD'],
+    ]
+   
 }
 
 
@@ -1374,8 +1374,10 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
             hns_patterns = detect_head_and_shoulders(df_slice, hns_config, require_preceding_trend)
             try:
                 from validator.validate_hns import validate_hns
+                from validator.explain_patterns import explain_pattern
             except ImportError:
                 validate_hns = None
+                explain_pattern = None
             for pattern in hns_patterns:
                 if pattern_counts['head_and_shoulders'] >= max_patterns_per_timeframe:
                     break
@@ -1383,6 +1385,13 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 if validate_hns:
                     validation = validate_hns(df_slice, pattern)
                     pattern['validation'] = validation
+                # Attach rule-of-thumb explanation and measured target
+                if 'explanation' not in pattern and 'P1' in pattern and 'P2' in pattern and 'P3' in pattern:
+                    try:
+                        if explain_pattern:
+                            pattern['explanation'] = explain_pattern(df_slice, pattern)
+                    except Exception:
+                        pass
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
@@ -1394,8 +1403,10 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
             # Import validator
             try:
                 from validator.validate_cup_handle import validate_cup_handle
+                from validator.explain_patterns import explain_pattern
             except ImportError:
                 validate_cup_handle = None
+                explain_pattern = None
             for pattern in ch_patterns:
                 if pattern_counts['cup_and_handle'] >= max_patterns_per_timeframe:
                     break
@@ -1403,6 +1414,12 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 if validate_cup_handle:
                     validation = validate_cup_handle(df_slice, pattern)
                     pattern['validation'] = validation
+                # Attach rule-of-thumb explanation and measured target
+                try:
+                    if explain_pattern:
+                        pattern['explanation'] = explain_pattern(df_slice, pattern)
+                except Exception:
+                    pass
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe_label
                 timeframe_patterns.append(pattern)
@@ -1425,13 +1442,21 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 # Validate double pattern
                 try:
                     from validator.validate_double_patterns import validate_double_pattern
+                    from validator.explain_patterns import explain_pattern
                 except ImportError:
                     validate_double_pattern = None
+                    explain_pattern = None
 
                 # Add validation
                 if validate_double_pattern:
                     validation = validate_double_pattern(df_slice, pattern)
                     pattern['validation'] = validation
+                # Attach rule-of-thumb explanation and measured target
+                try:
+                    if explain_pattern:
+                        pattern['explanation'] = explain_pattern(df_slice, pattern)
+                except Exception:
+                    pass
 
                 pattern['symbol'] = symbol
                 pattern['timeframe'] = timeframe_label

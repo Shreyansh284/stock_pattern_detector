@@ -29,6 +29,8 @@ class ChartHtml(BaseModel):
     timeframe: str
     pattern: str
     html: str
+    strength: Optional[str] = None  # 'strong' | 'weak'
+    explanation: Optional[Dict[str, Any]] = None
 
 class StockPatternResult(BaseModel):
     """Pattern detection result for a single stock."""

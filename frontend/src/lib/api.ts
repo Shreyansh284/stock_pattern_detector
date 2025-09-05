@@ -12,7 +12,7 @@ export type DetectRequest = {
   mode?: string
 }
 
-export type Chart = { timeframe: string; html: string; pattern?: string }
+export type Chart = { timeframe: string; html: string; pattern?: string; strength?: 'strong' | 'weak'; explanation?: any }
 
 export async function fetchStocks() {
   const { data } = await axios.get<string[]>(`${API_BASE}/stocks`)
@@ -40,7 +40,7 @@ export async function fetchModes() {
 }
 
 export async function detect(req: DetectRequest) {
-  const { data } = await axios.post<{ charts: Chart[] }>(`${API_BASE}/detect`, req)
+  const { data } = await axios.post<{ charts: Chart[]; strong_charts?: Chart[]; weak_charts?: Chart[] }>(`${API_BASE}/detect`, req)
   return data
 }
 // Request & response types for detecting patterns across all stocks

@@ -116,6 +116,8 @@ def detect_patterns(req: DetectRequest):
     )
     # Return at most one chart per timeframe (e.g., summary)
     charts = []
+    strong_charts = []
+    weak_charts = []
     seen_tf = set()
     for pattern in results:
         image_path = pattern.get('image_path')
@@ -127,8 +129,15 @@ def detect_patterns(req: DetectRequest):
         if image_path and image_path.endswith('.html') and os.path.exists(image_path):
             with open(image_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
-            charts.append({"timeframe": timeframe, "html": html_content})
-    return JSONResponse(content={"charts": charts})
+            # Determine strength for supported patterns
+            validation = (pattern.get('validation') or {})
+            explanation = (pattern.get('explanation') or {})
+            is_valid = bool(validation.get('is_valid')) or str(explanation.get('verdict', '')).lower() in ('valid', 'strong', 'true')
+            strength = 'strong' if is_valid else 'weak'
+            chart_item = {"timeframe": timeframe, "html": html_content, "strength": strength}
+            charts.append(chart_item)
+            (strong_charts if strength == 'strong' else weak_charts).append(chart_item)
+    return JSONResponse(content={"charts": charts, "strong_charts": strong_charts, "weak_charts": weak_charts})
     
 # -----------------------------
 # Detect-all (synchronous, legacy)
@@ -193,7 +202,6 @@ def detect_all_stocks(req: DetectAllRequest):
             current_price = 0.0
             current_volume = 0
         # Build charts list including pattern label
-        # Build charts list including separate entries per pattern
         charts = []
         seen_pairs = set()
         for p in raw:
@@ -207,10 +215,17 @@ def detect_all_stocks(req: DetectAllRequest):
             if path and path.endswith('.html') and os.path.exists(path):
                 with open(path, 'r', encoding='utf-8') as f:
                     html = f.read()
+                # Determine strength
+                validation = (p.get('validation') or {})
+                explanation = (p.get('explanation') or {})
+                is_valid = bool(validation.get('is_valid')) or str(explanation.get('verdict', '')).lower() in ('valid', 'strong', 'true')
+                strength = 'strong' if is_valid else 'weak'
                 charts.append({
                     'timeframe': tf,
                     'pattern': pattern_map.get(pat, pat),
-                    'html': html
+                    'html': html,
+                    'strength': strength,
+                    'explanation': explanation if explanation else None,
                 })
         # Append stock result
         results.append({
@@ -310,10 +325,17 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 if path and path.endswith('.html') and os.path.exists(path):
                     with open(path, 'r', encoding='utf-8') as f:
                         html = f.read()
+                    # Determine strength and include explanation if present
+                    validation = (p.get('validation') or {})
+                    explanation = (p.get('explanation') or {})
+                    is_valid = bool(validation.get('is_valid')) or str(explanation.get('verdict', '')).lower() in ('valid', 'strong', 'true')
+                    strength = 'strong' if is_valid else 'weak'
                     charts.append({
                         'timeframe': tf,
                         'pattern': pattern_map.get(pat, pat),
-                        'html': html
+                        'html': html,
+                        'strength': strength,
+                        'explanation': explanation if explanation else None,
                     })
             results.append({
                 'stock': stock,
