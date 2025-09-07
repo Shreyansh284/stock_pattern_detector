@@ -192,6 +192,11 @@ def detect_all_stocks(req: DetectAllRequest):
     stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
     # If past mode, derive stock list from CSV filenames
     def list_csv_symbols(data_dir: str) -> list[str]:
+        """Return symbols derived from CSV filenames, preferring only .NS suffixed versions.
+
+        Previously both raw symbol and symbol.NS were returned, causing duplicates in UI.
+        We now emit only the .NS variant (common for NSE listings) to avoid duplicates while
+        keeping compatibility (loader strips suffix when opening CSV)."""
         syms: list[str] = []
         try:
             for fn in os.listdir(data_dir):
@@ -200,18 +205,24 @@ def detect_all_stocks(req: DetectAllRequest):
                     syms.append(name)
         except Exception:
             pass
-        # Include with .NS suffix variants for convenience
-        uniq = []
-        seen = set()
+        uniq: list[str] = []
+        seen: set[str] = set()
         for s in syms:
-            for variant in (s, f"{s}.NS"):
-                if variant not in seen:
-                    seen.add(variant)
-                    uniq.append(variant)
+            variant = f"{s}.NS"
+            if variant not in seen:
+                seen.add(variant)
+                uniq.append(variant)
         return uniq
     stock_list = list_csv_symbols(stock_data_dir) if data_source == 'past' else AVAILABLE_STOCKS
-    if data_source == 'past' and len(stock_list) > 50:
-        stock_list = stock_list[:50]
+    if data_source == 'past':
+        limit = getattr(req, 'stock_limit', None) or 150
+        try:
+            limit = int(limit)
+        except Exception:
+            limit = 150
+        limit = max(1, min(1000, limit))  # safety bounds
+        if len(stock_list) > limit:
+            stock_list = stock_list[:limit]
     for stock in stock_list:
         # detect patterns for full set
         raw = process_symbol(
@@ -260,10 +271,11 @@ def detect_all_stocks(req: DetectAllRequest):
             print(f"Failed to fetch price/volume for {stock}: {e}")
             current_price = 0.0
             current_volume = 0
-        # Build charts list including pattern label
-        charts = []
-        seen_pairs = set()
-        for p in raw:
+    # Build charts list including pattern label
+    charts = []
+    seen_pairs = set()
+    seen_hashes = set()
+    for p in raw:
             tf = p.get('timeframe')
             pat = p.get('type')
             path = p.get('image_path')
@@ -274,6 +286,12 @@ def detect_all_stocks(req: DetectAllRequest):
             if path and path.endswith('.html') and os.path.exists(path):
                 with open(path, 'r', encoding='utf-8') as f:
                     html = f.read()
+                # Suppress duplicate identical charts (same content across symbols/timeframes)
+                import hashlib
+                hval = hashlib.sha256(html.encode('utf-8')).hexdigest()
+                if hval in seen_hashes:
+                    continue
+                seen_hashes.add(hval)
                 # Determine strength
                 validation = (p.get('validation') or {})
                 explanation = (p.get('explanation') or {})
@@ -286,8 +304,8 @@ def detect_all_stocks(req: DetectAllRequest):
                     'strength': strength,
                     'explanation': explanation if explanation else None,
                 })
-        # Append stock result
-        results.append({
+    # Append stock result
+    results.append({
             'stock': stock,
             'patterns': human_patterns,
             'pattern_counts': {pattern_map[k]: v for k, v in counts.items()},
@@ -339,6 +357,7 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
             return cand1 if os.path.isdir(cand1) else cand2
         stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
         def list_csv_symbols(data_dir: str) -> list[str]:
+            """Return only .NS suffixed symbols for past data to eliminate duplicates."""
             syms: list[str] = []
             try:
                 for fn in os.listdir(data_dir):
@@ -347,17 +366,24 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                         syms.append(name)
             except Exception:
                 pass
-            uniq = []
-            seen = set()
+            uniq: list[str] = []
+            seen: set[str] = set()
             for s in syms:
-                for variant in (s, f"{s}.NS"):
-                    if variant not in seen:
-                        seen.add(variant)
-                        uniq.append(variant)
+                variant = f"{s}.NS"
+                if variant not in seen:
+                    seen.add(variant)
+                    uniq.append(variant)
             return uniq
         stock_list = list_csv_symbols(stock_data_dir) if data_source == 'past' else AVAILABLE_STOCKS
-        if data_source == 'past' and len(stock_list) > 50:
-            stock_list = stock_list[:50]
+        if data_source == 'past':
+            limit = getattr(req, 'stock_limit', None) or 150
+            try:
+                limit = int(limit)
+            except Exception:
+                limit = 150
+            limit = max(1, min(1000, limit))
+            if len(stock_list) > limit:
+                stock_list = stock_list[:limit]
         results: List[Dict] = []
         total = len(stock_list)
         for idx, stock in enumerate(stock_list, start=1):
@@ -409,6 +435,7 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 current_volume = 0
             charts = []
             seen_pairs = set()
+            seen_hashes = set()
             for p in raw:
                 tf = p.get('timeframe')
                 pat = p.get('type')
@@ -420,6 +447,11 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 if path and path.endswith('.html') and os.path.exists(path):
                     with open(path, 'r', encoding='utf-8') as f:
                         html = f.read()
+                    import hashlib
+                    hval = hashlib.sha256(html.encode('utf-8')).hexdigest()
+                    if hval in seen_hashes:
+                        continue
+                    seen_hashes.add(hval)
                     # Determine strength and include explanation if present
                     validation = (p.get('validation') or {})
                     explanation = (p.get('explanation') or {})
@@ -491,63 +523,62 @@ def ticker_tape(count: int = 20):
     """Return up to `count` live tickers with price, change %, volume spike, and a small sparkline.
     Uses Yahoo Finance. Symbols come from AVAILABLE_STOCKS.
     """
+    # Serve cached response when fresh
+    now = time.time()
+    cached = _TICKER_CACHE.get(int(count))
+    if cached and (now - float(cached.get('ts', 0))) < _TICKER_CACHE_TTL_SEC:
+        return {'tickers': cached.get('items', [])[:count]}
+
+    # Cap symbols at 150 (was 50)
+    symbols = AVAILABLE_STOCKS[: max(1, min(150, count))]
     try:
-        # Serve from cache when fresh
-        now = time.time()
-        cached = _TICKER_CACHE.get(int(count))
-        if cached and (now - float(cached.get('ts', 0))) < _TICKER_CACHE_TTL_SEC:
-            return {'tickers': cached.get('items', [])[:count]}
-        # Choose symbols deterministically for stability
-        symbols = AVAILABLE_STOCKS[: max(1, min(50, count))]
-        # Fetch last ~1.5 months to build a 20-point sparkline robustly
         hist = yf.download(symbols, period='45d', interval='1d', group_by='ticker', progress=False, threads=True)
-        items = []
-        def _display(sym: str) -> str:
-            return sym[:-3] if sym.upper().endswith('.NS') else sym
-        for sym in symbols:
-            try:
-                # yfinance can return different shapes depending on single vs multi symbol
-                df = None
-                if isinstance(hist.columns, pd.MultiIndex):
-                    # group_by='ticker' -> columns level 0 is symbol
-                    if sym in hist.columns.get_level_values(0):
-                        df = hist[sym]
-                else:
-                    # Single-symbol dataframe
-                    df = hist
-                if df is None or df.empty:
-                    continue
-                df = df.dropna(subset=['Close'])
-                if df.empty:
-                    continue
-                closes = df['Close'].tail(20).tolist()
-                vols = df['Volume'].dropna()
-                last_close = float(df['Close'].iloc[-1]) if not df['Close'].empty else 0.0
-                prev_close = float(df['Close'].iloc[-2]) if len(df['Close']) > 1 else last_close
-                change_pct = ((last_close - prev_close) / prev_close * 100.0) if prev_close else 0.0
-                last_vol = int(vols.iloc[-1]) if not vols.empty else 0
-                avg_vol = float(vols.tail(20).mean()) if not vols.empty else 0.0
-                price_spike = abs(change_pct) >= 1.5
-                volume_spike = (avg_vol > 0 and last_vol >= avg_vol * 1.5)
-                items.append({
-                    'symbol': sym,
-                    'display_symbol': _display(sym),
-                    'price': round(last_close, 2),
-                    'change_pct': round(change_pct, 2),
-                    'volume': last_vol,
-                    'avg_volume': int(avg_vol) if avg_vol else 0,
-                    'price_spike': price_spike,
-                    'volume_spike': bool(volume_spike),
-                    'sparkline': closes,
-                })
-            except Exception:
-                continue
-        # Ensure we only return up to `count` items
-        payload = items[:count]
-        _TICKER_CACHE[int(count)] = { 'ts': now, 'items': payload }
-        return {'tickers': payload}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f'Failed to download data: {e}')
+
+    items = []
+    def _display(sym: str) -> str:
+        return sym[:-3] if sym.upper().endswith('.NS') else sym
+
+    for sym in symbols:
+        try:
+            df = None
+            if isinstance(hist.columns, pd.MultiIndex):
+                if sym in hist.columns.get_level_values(0):
+                    df = hist[sym]
+            else:
+                df = hist
+            if df is None or df.empty:
+                continue
+            df = df.dropna(subset=['Close'])
+            if df.empty:
+                continue
+            closes = df['Close'].tail(20).tolist()
+            vols = df['Volume'].dropna()
+            last_close = float(df['Close'].iloc[-1]) if not df['Close'].empty else 0.0
+            prev_close = float(df['Close'].iloc[-2]) if len(df['Close']) > 1 else last_close
+            change_pct = ((last_close - prev_close) / prev_close * 100.0) if prev_close else 0.0
+            last_vol = int(vols.iloc[-1]) if not vols.empty else 0
+            avg_vol = float(vols.tail(20).mean()) if not vols.empty else 0.0
+            price_spike = abs(change_pct) >= 1.5
+            volume_spike = (avg_vol > 0 and last_vol >= avg_vol * 1.5)
+            items.append({
+                'symbol': sym,
+                'display_symbol': _display(sym),
+                'price': round(last_close, 2),
+                'change_pct': round(change_pct, 2),
+                'volume': last_vol,
+                'avg_volume': int(avg_vol) if avg_vol else 0,
+                'price_spike': price_spike,
+                'volume_spike': bool(volume_spike),
+                'sparkline': closes,
+            })
+        except Exception:
+            continue
+
+    payload = items[:count]
+    _TICKER_CACHE[int(count)] = { 'ts': now, 'items': payload }
+    return {'tickers': payload}
 
 # Convenience endpoints explicitly matching the requirement wording
 @app.post('/detect/live')

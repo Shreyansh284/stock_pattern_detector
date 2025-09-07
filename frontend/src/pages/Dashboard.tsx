@@ -38,6 +38,7 @@ export default function Dashboard() {
     const [pages, setPages] = useState<Record<string, number>>({})
     const [chartTypes, setChartTypes] = useState<string[]>(['candle', 'line', 'ohlc'])
     const [chartType, setChartType] = useState<string>('candle')
+    const [stockLimit, setStockLimit] = useState<number>(150)
     const [progress, setProgress] = useState<number>(0)
     const [progressMsg, setProgressMsg] = useState<string>('')
     const [jobId, setJobId] = useState<string | null>(null)
@@ -104,7 +105,7 @@ export default function Dashboard() {
             setError('Start date must be before end date.')
             return
         }
-        const cacheKey = `${source}|${startDate}|${endDate}|${chartType}`
+        const cacheKey = `${source}|${startDate}|${endDate}|${chartType}|${source === 'past' ? stockLimit : 'na'}`
         // Serve from cache if available
         if (cacheRef.current[cacheKey]) {
             setData(cacheRef.current[cacheKey])
@@ -119,7 +120,7 @@ export default function Dashboard() {
         setData(null)
         setCacheNotice(null)
         try {
-            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any, data_source: source })
+            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any, data_source: source, ...(source === 'past' ? { stock_limit: stockLimit } : {}) })
             setJobId(job_id)
             // Poll progress
             await new Promise<void>((resolve, reject) => {
@@ -286,6 +287,20 @@ export default function Dashboard() {
                         placeholder="Candle"
                     />
                 </div>
+                {source === 'past' && (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Stock Limit</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={1000}
+                            value={stockLimit}
+                            onChange={e => setStockLimit(parseInt(e.target.value || '1', 10))}
+                            className="w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
+                        />
+                        <p className="mt-1 text-xs text-slate-500">Max number of CSV stocks to scan (default 150)</p>
+                    </div>
+                )}
                 <div className="flex items-end gap-2">
                     <Button onClick={runDetectAll} disabled={loading}>
                         {loading ? 'Detecting…' : 'Run Detection'}
@@ -411,7 +426,7 @@ export default function Dashboard() {
                                     <tr key={r.stock}>
                                         <td className="px-4 py-2 text-sm font-medium">{r.stock}</td>
                                         <td className="px-4 py-2 text-sm">
-                                            ${r.current_price > 0 ? r.current_price.toFixed(2) : 'N/A'}
+                                            ₹{r.current_price > 0 ? r.current_price.toFixed(2) : 'N/A'}
                                         </td>
                                         <td className="px-4 py-2 text-sm">
                                             {r.current_volume > 0 ? r.current_volume.toLocaleString() : 'N/A'}
