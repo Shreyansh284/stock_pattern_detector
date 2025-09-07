@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import Button from '../components/Button'
 import Select from '../components/Select'
@@ -41,6 +41,9 @@ export default function Dashboard() {
     const [progress, setProgress] = useState<number>(0)
     const [progressMsg, setProgressMsg] = useState<string>('')
     const [jobId, setJobId] = useState<string | null>(null)
+    // In-memory cache keyed by source|start|end|chartType
+    const cacheRef = useRef<Record<string, DetectAllResponse>>({})
+    const [cacheNotice, setCacheNotice] = useState<string | null>(null)
 
     useEffect(() => {
         // load available chart types from backend (optional)
@@ -101,10 +104,20 @@ export default function Dashboard() {
             setError('Start date must be before end date.')
             return
         }
+        const cacheKey = `${source}|${startDate}|${endDate}|${chartType}`
+        // Serve from cache if available
+        if (cacheRef.current[cacheKey]) {
+            setData(cacheRef.current[cacheKey])
+            setCacheNotice('Loaded cached results')
+            // brief fade-out notice
+            setTimeout(() => setCacheNotice(null), 2500)
+            return
+        }
         setLoading(true)
         setProgress(0)
         setProgressMsg('Queued')
         setData(null)
+        setCacheNotice(null)
         try {
             const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any, data_source: source })
             setJobId(job_id)
@@ -132,6 +145,7 @@ export default function Dashboard() {
             })
             const res = await getDetectAllResult(job_id)
             setData(res)
+            cacheRef.current[cacheKey] = res
             setProgress(100)
             setProgressMsg('Completed')
         } catch (e: any) {
@@ -272,12 +286,24 @@ export default function Dashboard() {
                         placeholder="Candle"
                     />
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                     <Button onClick={runDetectAll} disabled={loading}>
                         {loading ? 'Detecting…' : 'Run Detection'}
                     </Button>
+                    <Button
+                        type="button"
+                        disabled={loading || Object.keys(cacheRef.current).length === 0}
+                        onClick={() => { cacheRef.current = {}; setCacheNotice('Cache cleared'); setTimeout(() => setCacheNotice(null), 1500) }}
+                        className="bg-slate-200 text-slate-800 hover:bg-slate-300"
+                    >Clear Cache</Button>
                 </div>
             </div>
+
+            {cacheNotice && (
+                <div className="mb-4 text-xs px-3 py-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 inline-block">
+                    {cacheNotice}
+                </div>
+            )}
 
             {error && <div className="mb-4 text-red-600">{error}</div>}
 

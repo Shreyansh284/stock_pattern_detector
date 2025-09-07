@@ -73,10 +73,10 @@ export default function Home() {
                     setLoading(false)
                 }
             }
-        } catch {}
+        } catch { }
         const load = () => {
             fetchTickerTape(20)
-                .then((items) => { if (mounted) { setTickers(items); setLoading(false); try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items })) } catch {} } })
+                .then((items) => { if (mounted) { setTickers(items); setLoading(false); try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items })) } catch { } } })
                 .catch(() => {
                     // Fallback demo items
                     const fallback: TickerItem[] = [
@@ -85,7 +85,7 @@ export default function Home() {
                         { symbol: 'INFY.NS', display_symbol: 'INFY', price: 1682.1, change_pct: 1.12, volume: 0, avg_volume: 0, price_spike: true, volume_spike: false, sparkline: [80, 82, 84, 83, 85, 86, 88, 90, 92, 93] },
                         { symbol: 'HDFCBANK.NS', display_symbol: 'HDFCBANK', price: 1525.3, change_pct: 0.35, volume: 0, avg_volume: 0, price_spike: false, volume_spike: false, sparkline: [70, 69, 70, 71, 72, 73, 72, 74, 75, 76] },
                     ]
-                    if (mounted) { setTickers(fallback); setLoading(false); try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: fallback })) } catch {} }
+                    if (mounted) { setTickers(fallback); setLoading(false); try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: fallback })) } catch { } }
                 })
         }
         // Only hit network immediately if cache is stale
