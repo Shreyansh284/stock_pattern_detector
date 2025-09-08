@@ -28,6 +28,7 @@ class DetectAllRequest(BaseModel):
     data_source: Optional[str] = None # 'live' | 'past'
     stock_data_dir: Optional[str] = None
     stock_limit: Optional[int] = None  # optional limit for number of stocks when data_source='past'
+    batch_size: Optional[int] = 20  # number of stocks to process per batch
 
 class ChartHtml(BaseModel):
     """HTML chart data for a specific timeframe."""

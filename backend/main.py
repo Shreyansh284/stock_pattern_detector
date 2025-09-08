@@ -13,6 +13,9 @@ from uuid import uuid4
 import threading
 import time
 from datetime import datetime, timedelta
+import concurrent.futures
+from typing import Callable
+import asyncio
 
 app = FastAPI()
 
@@ -323,75 +326,14 @@ def detect_all_stocks(req: DetectAllRequest):
 PROGRESS: Dict[str, Dict] = {}
 RESULTS: Dict[str, DetectAllResponse] = {}
 
-def _run_detect_all_job(job_id: str, req: DetectAllRequest):
-    try:
-        PROGRESS[job_id] = {
-            'status': 'running',
-            'current': 0,
-            'total': len(AVAILABLE_STOCKS),
-            'symbol': None,
-            'message': 'Starting stock pattern scan...'
-        }
-        # Validate date range
-        if req.start_date >= req.end_date:
-            raise ValueError("start_date must be earlier than end_date")
-
-        pattern_map = {
-            'double_top': 'Double Top',
-            'double_bottom': 'Double Bottom',
-            'cup_and_handle': 'Cup and Handle',
-            'head_and_shoulders': 'Head and Shoulders',
-        }
-
-        # Determine source and stock list
-        data_source = (getattr(req, 'data_source', None) or 'live').lower()
-        def _resolve_data_dir(explicit: str | None) -> str:
-            if explicit and os.path.isdir(explicit):
-                return explicit
-            env = os.environ.get('STOCK_DATA_DIR')
-            if env and os.path.isdir(env):
-                return env
-            root = os.path.dirname(os.path.dirname(__file__))
-            cand1 = os.path.join(root, 'StockData')
-            cand2 = os.path.join(root, 'STOCK_DATA')
-            return cand1 if os.path.isdir(cand1) else cand2
-        stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
-        def list_csv_symbols(data_dir: str) -> list[str]:
-            """Return only .NS suffixed symbols for past data to eliminate duplicates."""
-            syms: list[str] = []
-            try:
-                for fn in os.listdir(data_dir):
-                    if fn.lower().endswith('.csv'):
-                        name = fn[:-4]
-                        syms.append(name)
-            except Exception:
-                pass
-            uniq: list[str] = []
-            seen: set[str] = set()
-            for s in syms:
-                variant = f"{s}.NS"
-                if variant not in seen:
-                    seen.add(variant)
-                    uniq.append(variant)
-            return uniq
-        stock_list = list_csv_symbols(stock_data_dir) if data_source == 'past' else AVAILABLE_STOCKS
-        if data_source == 'past':
-            limit = getattr(req, 'stock_limit', None) or 150
-            try:
-                limit = int(limit)
-            except Exception:
-                limit = 150
-            limit = max(1, min(1000, limit))
-            if len(stock_list) > limit:
-                stock_list = stock_list[:limit]
-        results: List[Dict] = []
-        total = len(stock_list)
-        for idx, stock in enumerate(stock_list, start=1):
-            PROGRESS[job_id].update({
-                'current': idx - 1,
-                'symbol': stock,
-                'message': f'Processing {stock} ({idx}/{total})'
-            })
+def _process_stock_batch(stocks: List[str], req: DetectAllRequest, pattern_map: Dict[str, str], 
+                       stock_data_dir: str, data_source: str) -> List[Dict]:
+    """Process a batch of stocks in parallel."""
+    batch_results = []
+    
+    def process_single_stock(stock: str) -> Dict:
+        """Process a single stock and return its result."""
+        try:
             raw = process_symbol(
                 symbol=stock,
                 timeframes=['custom'],
@@ -413,11 +355,17 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 data_source=data_source,
                 stock_data_dir=stock_data_dir,
             )
+            
+            # Count patterns per type
             types = [p.get('type') for p in raw if p.get('type')]
             counts: Dict[str, int] = {}
             for t in types:
                 counts[t] = counts.get(t, 0) + 1
+            
+            # Human-readable pattern list
             human_patterns = [pattern_map[t] for t in counts.keys()]
+            
+            # Fetch latest price and volume
             try:
                 ticker = yf.Ticker(stock)
                 hist = ticker.history(period='2d')
@@ -433,6 +381,8 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 print(f"Failed to fetch price/volume for {stock}: {e}")
                 current_price = 0.0
                 current_volume = 0
+            
+            # Build charts list
             charts = []
             seen_pairs = set()
             seen_hashes = set()
@@ -452,7 +402,7 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                     if hval in seen_hashes:
                         continue
                     seen_hashes.add(hval)
-                    # Determine strength and include explanation if present
+                    # Determine strength
                     validation = (p.get('validation') or {})
                     explanation = (p.get('explanation') or {})
                     is_valid = bool(validation.get('is_valid')) or str(explanation.get('verdict', '')).lower() in ('valid', 'strong', 'true')
@@ -464,7 +414,8 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                         'strength': strength,
                         'explanation': explanation if explanation else None,
                     })
-            results.append({
+            
+            return {
                 'stock': stock,
                 'patterns': human_patterns,
                 'pattern_counts': {pattern_map[k]: v for k, v in counts.items()},
@@ -472,27 +423,202 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 'current_price': current_price,
                 'current_volume': current_volume,
                 'charts': charts,
-            })
-            PROGRESS[job_id].update({ 'current': idx })
+            }
+        except Exception as e:
+            print(f"Error processing stock {stock}: {e}")
+            return {
+                'stock': stock,
+                'patterns': [],
+                'pattern_counts': {},
+                'count': 0,
+                'current_price': 0.0,
+                'current_volume': 0,
+                'charts': [],
+            }
+    
+    # Process stocks in parallel using ThreadPoolExecutor
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_stock = {executor.submit(process_single_stock, stock): stock for stock in stocks}
+        for future in concurrent.futures.as_completed(future_to_stock):
+            stock = future_to_stock[future]
+            try:
+                result = future.result()
+                batch_results.append(result)
+            except Exception as e:
+                print(f"Exception processing {stock}: {e}")
+                # Add empty result for failed stock
+                batch_results.append({
+                    'stock': stock,
+                    'patterns': [],
+                    'pattern_counts': {},
+                    'count': 0,
+                    'current_price': 0.0,
+                    'current_volume': 0,
+                    'charts': [],
+                })
+    
+    return batch_results
 
+def _run_detect_all_job(job_id: str, req: DetectAllRequest, batch_size: int = 20):
+    try:
+        # Initial progress setup
+        pattern_map = {
+            'double_top': 'Double Top',
+            'double_bottom': 'Double Bottom',
+            'cup_and_handle': 'Cup and Handle',
+            'head_and_shoulders': 'Head and Shoulders',
+        }
+
+        # Determine source and stock list
+        data_source = (getattr(req, 'data_source', None) or 'live').lower()
+        def _resolve_data_dir(explicit: str | None) -> str:
+            if explicit and os.path.isdir(explicit):
+                return explicit
+            env = os.environ.get('STOCK_DATA_DIR')
+            if env and os.path.isdir(env):
+                return env
+            root = os.path.dirname(os.path.dirname(__file__))
+            cand1 = os.path.join(root, 'StockData')
+            cand2 = os.path.join(root, 'STOCK_DATA')
+            return cand1 if os.path.isdir(cand1) else cand2
+        
+        stock_data_dir = _resolve_data_dir(getattr(req, 'stock_data_dir', None))
+        
+        def list_csv_symbols(data_dir: str) -> list[str]:
+            """Return only .NS suffixed symbols for past data to eliminate duplicates."""
+            syms: list[str] = []
+            try:
+                for fn in os.listdir(data_dir):
+                    if fn.lower().endswith('.csv'):
+                        name = fn[:-4]
+                        syms.append(name)
+            except Exception:
+                pass
+            uniq: list[str] = []
+            seen: set[str] = set()
+            for s in syms:
+                variant = f"{s}.NS"
+                if variant not in seen:
+                    seen.add(variant)
+                    uniq.append(variant)
+            return uniq
+        
+        stock_list = list_csv_symbols(stock_data_dir) if data_source == 'past' else AVAILABLE_STOCKS
+        
+        if data_source == 'past':
+            limit = getattr(req, 'stock_limit', None) or 150
+            try:
+                limit = int(limit)
+            except Exception:
+                limit = 150
+            limit = max(1, min(1000, limit))
+            if len(stock_list) > limit:
+                stock_list = stock_list[:limit]
+
+        # Validate date range
+        if req.start_date >= req.end_date:
+            raise ValueError("start_date must be earlier than end_date")
+
+        total_stocks = len(stock_list)
+        
+        # Initialize progress
+        PROGRESS[job_id] = {
+            'status': 'running',
+            'current': 0,
+            'total': total_stocks,
+            'symbol': None,
+            'message': f'Starting pattern detection for {total_stocks} stocks in batches of {batch_size}...',
+            'current_batch': 0,
+            'total_batches': (total_stocks + batch_size - 1) // batch_size,
+        }
+
+        # Create batches
+        batches = []
+        for i in range(0, total_stocks, batch_size):
+            batch = stock_list[i:i + batch_size]
+            batches.append(batch)
+
+        results: List[Dict] = []
+        processed_count = 0
+
+        # Process each batch
+        for batch_idx, batch in enumerate(batches, 1):
+            batch_start_time = time.time()
+            
+            # Update progress for current batch
+            PROGRESS[job_id].update({
+                'current_batch': batch_idx,
+                'message': f'Processing batch {batch_idx}/{len(batches)} ({len(batch)} stocks)...',
+                'symbol': f'Batch {batch_idx}: {batch[0]} to {batch[-1]}',
+            })
+
+            # Process the batch in parallel
+            batch_results = _process_stock_batch(batch, req, pattern_map, stock_data_dir, data_source)
+            results.extend(batch_results)
+            
+            processed_count += len(batch)
+            batch_time = time.time() - batch_start_time
+            
+            # Update progress after batch completion
+            PROGRESS[job_id].update({
+                'current': processed_count,
+                'message': f'Completed batch {batch_idx}/{len(batches)} in {batch_time:.1f}s. Total processed: {processed_count}/{total_stocks}',
+            })
+
+        # Final completion
         RESULTS[job_id] = DetectAllResponse(results=results)
-        PROGRESS[job_id].update({ 'status': 'done', 'message': 'Completed' })
+        PROGRESS[job_id].update({
+            'status': 'done',
+            'current': total_stocks,
+            'message': f'Completed processing {total_stocks} stocks in {len(batches)} batches'
+        })
+        
     except Exception as e:
         PROGRESS[job_id] = {
             'status': 'error',
             'current': PROGRESS.get(job_id, {}).get('current', 0),
             'total': PROGRESS.get(job_id, {}).get('total', len(AVAILABLE_STOCKS)),
             'symbol': PROGRESS.get(job_id, {}).get('symbol', None),
-            'message': f'Error: {e}'
+            'message': f'Error: {e}',
+            'current_batch': PROGRESS.get(job_id, {}).get('current_batch', 0),
+            'total_batches': PROGRESS.get(job_id, {}).get('total_batches', 0),
         }
 
 @app.post('/detect-all-start')
 def detect_all_start(req: DetectAllRequest):
     job_id = str(uuid4())
-    PROGRESS[job_id] = { 'status': 'queued', 'current': 0, 'total': len(AVAILABLE_STOCKS), 'symbol': None, 'message': 'Queued' }
-    t = threading.Thread(target=_run_detect_all_job, args=(job_id, req), daemon=True)
+    batch_size = getattr(req, 'batch_size', 20) or 20
+    batch_size = max(1, min(50, batch_size))  # Limit batch size between 1 and 50
+    
+    PROGRESS[job_id] = { 
+        'status': 'queued', 
+        'current': 0, 
+        'total': len(AVAILABLE_STOCKS), 
+        'symbol': None, 
+        'message': f'Queued with batch size {batch_size}',
+        'current_batch': 0,
+        'total_batches': 0,
+        'batch_size': batch_size
+    }
+    t = threading.Thread(target=_run_detect_all_job, args=(job_id, req, batch_size), daemon=True)
     t.start()
-    return { 'job_id': job_id }
+    return { 'job_id': job_id, 'batch_size': batch_size }
+
+@app.get("/batch-config")
+def get_batch_config():
+    """Get available batch processing configuration options."""
+    return {
+        "default_batch_size": 20,
+        "min_batch_size": 1,
+        "max_batch_size": 50,
+        "recommended_batch_sizes": [10, 20, 30, 40, 50],
+        "max_workers_per_batch": 5,
+        "description": {
+            "batch_size": "Number of stocks to process in parallel per batch",
+            "smaller_batches": "Smaller batches use less memory but may take longer overall",
+            "larger_batches": "Larger batches are faster but use more memory and CPU"
+        }
+    }
 
 @app.get('/detect-all-progress')
 def detect_all_progress(job_id: str):
@@ -503,7 +629,19 @@ def detect_all_progress(job_id: str):
     current = int(p.get('current') or 0)
     total = int(p.get('total') or 1)
     percent = int(min(100, max(0, (current / total) * 100)))
-    return { **p, 'percent': percent }
+    
+    # Add batch-specific information
+    result = { **p, 'percent': percent }
+    if 'current_batch' in p and 'total_batches' in p:
+        current_batch = int(p.get('current_batch') or 0)
+        total_batches = int(p.get('total_batches') or 1)
+        batch_percent = int(min(100, max(0, (current_batch / total_batches) * 100))) if total_batches > 0 else 0
+        result.update({
+            'batch_percent': batch_percent,
+            'batch_info': f"Batch {current_batch}/{total_batches}"
+        })
+    
+    return result
 
 @app.get('/detect-all-result', response_model=DetectAllResponse)
 def detect_all_result(job_id: str):
