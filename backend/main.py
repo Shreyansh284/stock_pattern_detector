@@ -1,13 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import DetectRequest, DetectAllRequest, DetectAllResponse
+from backend.schemas import DetectRequest, DetectAllRequest, DetectAllResponse
 from typing import List, Dict
 import sys
 import os
 import yfinance as yf
 import pandas as pd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from detect_all_patterns import process_symbol, DEFAULT_SYMBOLS, TIMEFRAMES
+from backend.detect_all_patterns import process_symbol, DEFAULT_SYMBOLS, TIMEFRAMES
 from fastapi.responses import JSONResponse
 from uuid import uuid4
 import threading
@@ -19,9 +19,13 @@ import asyncio
 
 app = FastAPI()
 
+# CORS Configuration - supports environment variable override
+cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

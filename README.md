@@ -450,6 +450,43 @@ python detect_head_and_shoulders.py --mode lenient
 - Add a logging/debug mode that writes rejection reasons for each candidate to help tuning.
 - Add a CLI to override symbols, windows, and tuning parameters without editing the file.
 
+## 🚀 Deployment
+
+### Backend Deployment (Render)
+
+The FastAPI backend can be deployed to Render for free hosting:
+
+**Build Command:**
+```bash
+pip install -r backend/requirements.txt
+```
+
+**Start Command:**
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+```
+
+**Environment Variables (set in Render dashboard):**
+- `PORT`: Automatically set by Render
+- `CORS_ORIGINS`: Your frontend domain (e.g., `https://your-app.vercel.app`)
+- `STOCK_DATA_DIR`: `/tmp/stock_data` (optional)
+- `PYTHONPATH`: `/app` (optional)
+
+**Local Testing:**
+```bash
+# Test the production configuration locally
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+### Frontend Deployment (Vercel)
+
+The React frontend can be deployed to Vercel:
+
+1. Connect your GitHub repository to Vercel
+2. Set the root directory to `frontend/`
+3. Set environment variable: `VITE_API_URL=https://your-backend.onrender.com`
+4. Deploy automatically on push to main branch
+
 ## License
 
 This repository contains example code. Check and comply with Yahoo/Google/Exchange data licensing when using downloaded price data in production.
