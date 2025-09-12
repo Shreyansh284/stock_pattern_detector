@@ -82,36 +82,54 @@ export const useDetectStore = create<State & Actions>()(
   setEndDate: (v) => set({ endDate: v }),
   setDataSource: (v) => set({ dataSource: v }),
   runDetect: async () => {
-  const { selectedStock, selectedPattern, selectedTimeframe, selectedChartType, useDateRange, startDate, endDate, selectedMode, dataSource } = get()
-  if (!selectedStock || !selectedPattern || !selectedChartType || !selectedMode) {
-      set({ error: 'Please select stock, pattern and chart type.' })
-      return
+    const { selectedStock, selectedPattern, selectedTimeframe, selectedChartType, useDateRange, startDate, endDate, selectedMode, dataSource, patterns } = get();
+    if (!selectedStock || !selectedPattern || !selectedChartType || !selectedMode) {
+      set({ error: 'Please select stock, pattern and chart type.' });
+      return;
     }
     if (useDateRange) {
       if (!startDate || !endDate) {
-        set({ error: 'Please select start and end date.' })
-        return
+        set({ error: 'Please select start and end date.' });
+        return;
       }
     } else {
       if (!selectedTimeframe) {
-        set({ error: 'Please select a timeframe or switch to date range.' })
-        return
+        set({ error: 'Please select a timeframe or switch to date range.' });
+        return;
       }
     }
-    set({ loading: true, error: undefined, charts: [] })
+    set({ loading: true, error: undefined, charts: [], strongCharts: [], weakCharts: [] });
     try {
-  const base = { stock: selectedStock, pattern: selectedPattern, chart_type: selectedChartType, mode: selectedMode, data_source: dataSource }
-      const payload = useDateRange
-        ? { ...base, start_date: startDate, end_date: endDate }
-        : { ...base, timeframe: selectedTimeframe }
-  const res = await detect(payload as any)
-  const strong = res.strong_charts ?? res.charts?.filter(c => c.strength === 'strong') ?? []
-  const weak = res.weak_charts ?? res.charts?.filter(c => c.strength === 'weak') ?? []
-  set({ charts: res.charts, strongCharts: strong, weakCharts: weak })
+      let allCharts = [];
+      let allStrong = [];
+      let allWeak = [];
+      if (selectedPattern === 'All') {
+        // Run detection for all patterns and merge results
+        for (const pattern of patterns) {
+          const base = { stock: selectedStock, pattern, chart_type: selectedChartType, mode: selectedMode, data_source: dataSource };
+          const payload = useDateRange
+            ? { ...base, start_date: startDate, end_date: endDate }
+            : { ...base, timeframe: selectedTimeframe };
+          const res = await detect(payload as any);
+          if (res.charts) allCharts = allCharts.concat(res.charts.map(c => ({ ...c, pattern })));
+          if (res.strong_charts) allStrong = allStrong.concat(res.strong_charts.map(c => ({ ...c, pattern })));
+          if (res.weak_charts) allWeak = allWeak.concat(res.weak_charts.map(c => ({ ...c, pattern })));
+        }
+      } else {
+        const base = { stock: selectedStock, pattern: selectedPattern, chart_type: selectedChartType, mode: selectedMode, data_source: dataSource };
+        const payload = useDateRange
+          ? { ...base, start_date: startDate, end_date: endDate }
+          : { ...base, timeframe: selectedTimeframe };
+        const res = await detect(payload as any);
+        if (res.charts) allCharts = res.charts;
+        if (res.strong_charts) allStrong = res.strong_charts;
+        if (res.weak_charts) allWeak = res.weak_charts;
+      }
+      set({ charts: allCharts, strongCharts: allStrong, weakCharts: allWeak });
     } catch (e: any) {
-      set({ error: e?.message ?? 'Detection failed' })
+      set({ error: e?.message ?? 'Detection failed' });
     } finally {
-      set({ loading: false })
+      set({ loading: false });
     }
   },
   clearCharts: () => set({ charts: [] }),

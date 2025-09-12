@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import Button from '../components/Button'
 import Select from '../components/Select'
 import HtmlPanel from '../components/HtmlPanel'
-import { detectAll, fetchChartTypes, type Chart, startDetectAll, getDetectAllProgress, getDetectAllResult } from '../lib/api'
+import { detectAll, fetchChartTypes, fetchModes, type Chart, startDetectAll, getDetectAllProgress, getDetectAllResult } from '../lib/api'
 
 type StockPatternResult = {
     stock: string
@@ -38,6 +38,8 @@ export default function Dashboard() {
     const [pages, setPages] = useState<Record<string, number>>({})
     const [chartTypes, setChartTypes] = useState<string[]>(['candle', 'line', 'ohlc'])
     const [chartType, setChartType] = useState<string>('candle')
+    const [modes, setModes] = useState<string[]>(['lenient', 'strict'])
+    const [mode, setMode] = useState<string>('lenient')
     const [stockLimit, setStockLimit] = useState<number>(150)
     const [progress, setProgress] = useState<number>(0)
     const [progressMsg, setProgressMsg] = useState<string>('')
@@ -47,8 +49,9 @@ export default function Dashboard() {
     const [cacheNotice, setCacheNotice] = useState<string | null>(null)
 
     useEffect(() => {
-        // load available chart types from backend (optional)
-        fetchChartTypes().then(setChartTypes).catch(() => { })
+        // load available chart types and modes from backend (optional)
+        fetchChartTypes().then(setChartTypes).catch(console.error)
+        fetchModes().then(setModes).catch(console.error)
     }, [])
 
     // Simple skeletons
@@ -105,7 +108,7 @@ export default function Dashboard() {
             setError('Start date must be before end date.')
             return
         }
-        const cacheKey = `${source}|${startDate}|${endDate}|${chartType}|${source === 'past' ? stockLimit : 'na'}`
+        const cacheKey = `${source}|${startDate}|${endDate}|${chartType}|${mode}|${source === 'past' ? stockLimit : 'na'}`
         // Serve from cache if available
         if (cacheRef.current[cacheKey]) {
             setData(cacheRef.current[cacheKey])
@@ -120,7 +123,7 @@ export default function Dashboard() {
         setData(null)
         setCacheNotice(null)
         try {
-            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any, data_source: source, ...(source === 'past' ? { stock_limit: stockLimit } : {}) })
+            const { job_id } = await startDetectAll({ start_date: startDate, end_date: endDate, chart_type: chartType as any, mode: mode as any, data_source: source, ...(source === 'past' ? { stock_limit: stockLimit } : {}) })
             setJobId(job_id)
             // Poll progress
             await new Promise<void>((resolve, reject) => {
@@ -285,6 +288,18 @@ export default function Dashboard() {
                         onChange={(v) => setChartType(v ?? 'candle')}
                         options={chartTypes.map(ct => ({ value: ct, label: ct.charAt(0).toUpperCase() + ct.slice(1) }))}
                         placeholder="Candle"
+                    />
+                </div>
+                <div>
+                    <Select
+                        label="Validation Mode"
+                        value={mode}
+                        onChange={(v) => setMode(v ?? 'lenient')}
+                        options={modes.map(m => ({
+                            value: m,
+                            label: m === 'lenient' ? 'Lenient (Market Reality)' : 'Strict (Textbook)'
+                        }))}
+                        placeholder="Lenient"
                     />
                 </div>
                 {source === 'past' && (
@@ -513,15 +528,15 @@ export default function Dashboard() {
                                             </div>
                                             <div className="p-4 space-y-4">
                                                 {chartsToShow.map((c, idx) => {
-                                                    if (!c || !c.html) return null
-                                                    const exp = (c as any)?.explanation as any
-                                                    const rules: any[] = Array.isArray(exp?.rules) ? exp.rules : []
-                                                    const target = exp?.target
+                                                    if (!c || !c.html) return null;
+                                                    const exp = (c as any)?.explanation as any;
+                                                    const rules: any[] = Array.isArray(exp?.rules) ? exp.rules : [];
+                                                    const target = exp?.target;
                                                     return (
-                                                        <div key={start + idx} className="border rounded-lg overflow-hidden">
-                                                            <div className="mb-2 text-xs text-slate-500">
+                                                        <details key={start + idx} className="border rounded-lg overflow-hidden" >
+                                                            <summary className=" text-xs text-slate-500 cursor-pointer select-none py-3 px-3" >
                                                                 Pattern: {c.pattern || 'Unknown'} | Timeframe: {c.timeframe || 'Unknown'}{c && (c as any).strength ? ` | Strength: ${(c as any).strength}` : ''}
-                                                            </div>
+                                                            </summary>
                                                             <HtmlPanel html={c.html} id={`dash-chart-${r.stock}-${start + idx}`} />
                                                             {(exp && (rules.length > 0 || target)) && (
                                                                 <details className="bg-slate-50 border-t">
@@ -531,7 +546,7 @@ export default function Dashboard() {
                                                                             <div className="font-semibold mb-2">Validation rules</div>
                                                                             <ul className="space-y-1 list-disc list-inside">
                                                                                 {rules.map((rul: any, i: number) => (
-                                                                                    <li key={i} className={rul.passed ? 'text-green-700' : 'text-amber-700'}>
+                                                                                    <li key={i} className={rul.passed ? 'text-green-500' : 'text-amber-700'}>
                                                                                         {rul.name}: <span className="font-mono">{rul.value}</span> (expected {rul.expected})
                                                                                         {rul.notes ? <span className="text-slate-500"> — {rul.notes}</span> : null}
                                                                                     </li>
@@ -561,8 +576,8 @@ export default function Dashboard() {
                                                                     </div>
                                                                 </details>
                                                             )}
-                                                        </div>
-                                                    )
+                                                        </details>
+                                                    );
                                                 })}
                                             </div>
                                             {chartsToFilter.length > itemsPerPage && (

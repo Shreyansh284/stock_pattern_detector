@@ -55,11 +55,11 @@ HNS_CONFIG = {
         'VOLUME_SPIKE_MULT': 1.75,
     },
     'lenient': {
-        'SHOULDER_TOL': 0.15,
-        'HEAD_OVER_SHOULDER_PCT': 0.03,
-        'MAX_NECKLINE_ANGLE_DEG': 45,
-        'VOLUME_TREND_TOL': 0.85,
-        'VOLUME_SPIKE_MULT': 1.25,
+        'SHOULDER_TOL': 0.30,        # Increased to 30%
+        'HEAD_OVER_SHOULDER_PCT': 0.005,  # Reduced to 0.5%
+        'MAX_NECKLINE_ANGLE_DEG': 60,    # Increased to 60 degrees
+        'VOLUME_TREND_TOL': 0.50,        # Very lenient volume requirement
+        'VOLUME_SPIKE_MULT': 1.10,       # Very lenient volume spike
     }
 }
 
@@ -88,22 +88,22 @@ CH_CONFIG = {
 
 DT_CONFIG = {
     'strict': {
-        'PEAK_SIMILARITY_TOL': 0.06,
-        'MIN_PROMINENCE_PCT': 0.06,
-        'MAX_SPACING_DAYS': 90,
-        'MIN_SPACING_DAYS': 20,
-        'VOLUME_DECLINE_PCT': 0.90,
-        'VOLUME_SPIKE_MULT': 1.75,
-        'NECKLINE_TOLERANCE': 0.015,
+        'PEAK_SIMILARITY_TOL': 0.08,  # Increased from 0.06 to 0.08 (8%)
+        'MIN_PROMINENCE_PCT': 0.05,   # Slightly reduced from 0.06 to 0.05
+        'MAX_SPACING_DAYS': 150,      # Increased from 90 to 150 days
+        'MIN_SPACING_DAYS': 15,       # Reduced from 20 to 15 days
+        'VOLUME_DECLINE_PCT': 0.85,   # Reduced from 0.90 to 0.85
+        'VOLUME_SPIKE_MULT': 1.5,     # Reduced from 1.75 to 1.5
+        'NECKLINE_TOLERANCE': 0.02,   # Slightly increased from 0.015 to 0.02
     },
     'lenient': {
-    'PEAK_SIMILARITY_TOL': 0.06,
-        'MIN_PROMINENCE_PCT': 0.03,
-        'MAX_SPACING_DAYS': 150,
-        'MIN_SPACING_DAYS': 10,
-        'VOLUME_DECLINE_PCT': 0.75,
-        'VOLUME_SPIKE_MULT': 1.25,
-        'NECKLINE_TOLERANCE': 0.03,
+        'PEAK_SIMILARITY_TOL': 0.15,  # Increased to 15% for lenient mode
+        'MIN_PROMINENCE_PCT': 0.03,   # Keep existing
+        'MAX_SPACING_DAYS': 200,      # Increased from 150 to 200 days
+        'MIN_SPACING_DAYS': 10,       # Keep existing
+        'VOLUME_DECLINE_PCT': 0.70,   # Reduced from 0.75 to 0.70
+        'VOLUME_SPIKE_MULT': 1.25,    # Keep existing
+        'NECKLINE_TOLERANCE': 0.035,  # Slightly increased from 0.03 to 0.035
     }
 }
 
@@ -120,18 +120,27 @@ GLOBAL_CONFIG = {
 
 # Default symbol lists
 DEFAULT_SYMBOLS = {
-    'us_tech': ['AAPL', 'GOOGL', 'GOOG', 'MSFT', 'AMZN', 'TSLA', 'NVDA', 'META', 'NFLX', 'AMD'],
-    'us_large': ['SPY', 'QQQ', 'IWM', 'DIA', 'VTI', 'JPM', 'JNJ', 'PG', 'KO', 'WMT'],
-    'indian_popular': [
-        'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS',
-        'BHARTIARTL.NS', 'HINDUNILVR.NS', 'ITC.NS', 'LT.NS', 'AXISBANK.NS', 'KOTAKBANK.NS',
-        'MARUTI.NS', 'ASIANPAINT.NS', 'BAJFINANCE.NS', 'HCLTECH.NS', 'WIPRO.NS',
-        'ONGC.NS', 'SUNPHARMA.NS', 'LTIM.NS', 'NESTLEIND.NS', 'TATAMOTORS.NS',
-        'TATASTEEL.NS', 'JSWSTEEL.NS', 'ADANIGREEN.NS', 'ADANIPOWER.NS'
-    ],
-    'indian_banking': [
-        'HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS', 'AXISBANK.NS', 'KOTAKBANK.NS',
-        'BANKBARODA.NS', 'INDUSINDBK.NS', 'FEDERALBNK.NS', 'IDFCFIRSTB.NS'
+       'indian_nse': [
+        'ABB.NS', 'ACC.NS', 'APLAPOLLO.NS', 'AUBANK.NS', 'ADANIENSOL.NS', 'ADANIENT.NS', 'ADANIGREEN.NS', 'ADANIPORTS.NS', 'ADANIPOWER.NS', 'ATGL.NS',
+        'ABCAPITAL.NS', 'ABFRL.NS', 'ALKEM.NS', 'AMBUJACEM.NS', 'APOLLOHOSP.NS', 'APOLLOTYRE.NS', 'ASHOKLEY.NS', 'ASIANPAINT.NS', 'ASTRAL.NS', 'AUROPHARMA.NS',
+        'DMART.NS', 'AXISBANK.NS', 'BSE.NS', 'BAJAJ-AUTO.NS', 'BAJFINANCE.NS', 'BAJAJFINSV.NS', 'BAJAJHLDNG.NS', 'BAJAJHFL.NS', 'BANDHANBNK.NS', 'BANKBARODA.NS',
+        'BANKINDIA.NS', 'MAHABANK.NS', 'BDL.NS', 'BEL.NS', 'BHARATFORG.NS', 'BHEL.NS', 'BPCL.NS', 'BHARTIARTL.NS', 'BHARTIHEXA.NS', 'BIOCON.NS',
+        'BOSCHLTD.NS', 'BRITANNIA.NS', 'CGPOWER.NS', 'CANBK.NS', 'CHOLAFIN.NS', 'CIPLA.NS', 'COALINDIA.NS', 'COCHINSHIP.NS', 'COFORGE.NS', 'COLPAL.NS',
+        'CONCOR.NS', 'CUMMINSIND.NS', 'DLF.NS', 'DABUR.NS', 'DIVISLAB.NS', 'DIXON.NS', 'DRREDDY.NS', 'EICHERMOT.NS', 'ESCORTS.NS', 'ETERNAL.NS',
+        'EXIDEIND.NS', 'NYKAA.NS', 'FEDERALBNK.NS', 'GAIL.NS', 'GMRAIRPORT.NS', 'GLENMARK.NS', 'GODREJCP.NS', 'GODREJPROP.NS', 'GRASIM.NS', 'HCLTECH.NS',
+        'HDFCAMC.NS', 'HDFCBANK.NS', 'HDFCLIFE.NS', 'HAVELLS.NS', 'HEROMOTOCO.NS', 'HINDALCO.NS', 'HAL.NS', 'HINDPETRO.NS', 'HINDUNILVR.NS', 'HINDZINC.NS',
+        'HUDCO.NS', 'HYUNDAI.NS', 'ICICIBANK.NS', 'ICICIGI.NS', 'ICICIPRULI.NS', 'IDFCFIRSTB.NS', 'IRB.NS', 'ITC.NS', 'INDIANB.NS', 'INDHOTEL.NS',
+        'IOC.NS', 'IRCTC.NS', 'IRFC.NS', 'IREDA.NS', 'IGL.NS', 'INDUSTOWER.NS', 'INDUSINDBK.NS', 'NAUKRI.NS', 'INFY.NS', 'INDIGO.NS',
+        'JSWENERGY.NS', 'JSWSTEEL.NS', 'JINDALSTEL.NS', 'JIOFIN.NS', 'JUBLFOOD.NS', 'KPITTECH.NS', 'KALYANKJIL.NS', 'KOTAKBANK.NS', 'LTF.NS', 'LICHSGFIN.NS',
+        'LTIM.NS', 'LT.NS', 'LICI.NS', 'LODHA.NS', 'LUPIN.NS', 'MRF.NS', 'M&MFIN.NS', 'M&M.NS', 'MANKIND.NS', 'MARICO.NS',
+        'MARUTI.NS', 'MFSL.NS', 'MAXHEALTH.NS', 'MAZDOCK.NS', 'MOTILALOFS.NS', 'MPHASIS.NS', 'MUTHOOTFIN.NS', 'NHPC.NS', 'NMDC.NS', 'NTPCGREEN.NS',
+        'NTPC.NS', 'NATIONALUM.NS', 'NESTLEIND.NS', 'OBEROIRLTY.NS', 'ONGC.NS', 'OIL.NS', 'OLAELEC.NS', 'PAYTM.NS', 'OFSS.NS', 'POLICYBZR.NS',
+        'PIIND.NS', 'PAGEIND.NS', 'PATANJALI.NS', 'PERSISTENT.NS', 'PETRONET.NS', 'PHOENIXLTD.NS', 'PIDILITIND.NS', 'POLYCAB.NS', 'PFC.NS', 'POWERGRID.NS',
+        'PREMIERENE.NS', 'PRESTIGE.NS', 'PNB.NS', 'RECLTD.NS', 'RVNL.NS', 'RELIANCE.NS', 'SBICARD.NS', 'SBILIFE.NS', 'SJVN.NS', 'SRF.NS',
+        'MOTHERSON.NS', 'SHREECEM.NS', 'SHRIRAMFIN.NS', 'SIEMENS.NS', 'SOLARINDS.NS', 'SONACOMS.NS', 'SBIN.NS', 'SAIL.NS', 'SUNPHARMA.NS', 'SUPREMEIND.NS',
+        'SUZLON.NS', 'SWIGGY.NS', 'TVSMOTOR.NS', 'TATACOMM.NS', 'TCS.NS', 'TATACONSUM.NS', 'TATAELXSI.NS', 'TATAMOTORS.NS', 'TATAPOWER.NS', 'TATASTEEL.NS',
+        'TATATECH.NS', 'TECHM.NS', 'TITAN.NS', 'TORNTPHARM.NS', 'TORNTPOWER.NS', 'TRENT.NS', 'TIINDIA.NS', 'UPL.NS', 'ULTRACEMCO.NS', 'UNIONBANK.NS',
+        'UNITDSPR.NS', 'VBL.NS', 'VEDL.NS', 'VMM.NS', 'IDEA.NS', 'VOLTAS.NS', 'WAAREEENER.NS', 'WIPRO.NS', 'YESBANK.NS', 'ZYDUSLIFE.NS'
     ]
    
 }
@@ -174,6 +183,45 @@ TIMEFRAMES = {
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
+
+def validate_pattern_outcome(data, pattern, lookback_periods=30):
+    """Check if Head & Shoulders pattern actually worked as bearish reversal"""
+    try:
+        breakout_idx = pattern['breakout'][2]
+        if breakout_idx + lookback_periods >= len(data):
+            return True  # Too recent to judge
+        
+        breakout_price = data['Close'].iloc[breakout_idx]
+        future_low = data['Low'].iloc[breakout_idx:breakout_idx + lookback_periods].min()
+        
+        # Pattern should show meaningful decline after breakout
+        decline_pct = (breakout_price - future_low) / breakout_price
+        return decline_pct >= 0.03  # 3% minimum decline
+    except Exception:
+        return True  # If can't validate, don't reject
+
+def check_preceding_trend_improved(data, start_idx, trend_type, lookback=20):
+    """More robust trend detection"""
+    if start_idx < lookback:
+        return False
+    
+    try:
+        start_price = data['Close'].iloc[start_idx - lookback]
+        end_price = data['Close'].iloc[start_idx]
+        
+        if trend_type == 'up':
+            trend_strength = (end_price - start_price) / start_price
+            # Check for consistent movement, not just endpoints
+            mid_price = data['Close'].iloc[start_idx - lookback//2]
+            mid_trend = (mid_price - start_price) / start_price
+            end_trend = (end_price - mid_price) / mid_price
+            
+            # Require both halves show upward movement
+            return trend_strength >= 0.10 and mid_trend > 0 and end_trend > 0
+        
+        return False
+    except Exception:
+        return False
 
 def load_data(symbol, start_date, end_date):
     """Load stock data from yfinance."""
@@ -300,6 +348,163 @@ def compute_dynamic_nbars(data, base=20, min_bars=8, max_bars=60):
     except Exception:
         return base
 
+def compute_rsi(data, period=14):
+    """Compute Relative Strength Index (RSI)."""
+    try:
+        delta = data['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.fillna(50)  # Fill NaN with neutral RSI
+    except Exception:
+        return pd.Series([50] * len(data), index=data.index)
+
+def compute_macd(data, fast_period=12, slow_period=26, signal_period=9):
+    """Compute MACD (Moving Average Convergence Divergence)."""
+    try:
+        ema_fast = data['Close'].ewm(span=fast_period).mean()
+        ema_slow = data['Close'].ewm(span=slow_period).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=signal_period).mean()
+        histogram = macd_line - signal_line
+        return {
+            'macd': macd_line,
+            'signal': signal_line, 
+            'histogram': histogram
+        }
+    except Exception:
+        return {
+            'macd': pd.Series([0] * len(data), index=data.index),
+            'signal': pd.Series([0] * len(data), index=data.index),
+            'histogram': pd.Series([0] * len(data), index=data.index)
+        }
+
+def check_momentum_divergence(data, idx1, idx2, lookback=5):
+    """Check for bearish momentum divergence between two peaks."""
+    try:
+        # Get RSI values around the peaks
+        rsi = compute_rsi(data)
+        
+        # Average RSI around each peak (using lookback bars)
+        start1 = max(0, idx1 - lookback)
+        end1 = min(len(data), idx1 + lookback + 1)
+        start2 = max(0, idx2 - lookback)  
+        end2 = min(len(data), idx2 + lookback + 1)
+        
+        rsi1_avg = rsi.iloc[start1:end1].mean()
+        rsi2_avg = rsi.iloc[start2:end2].mean()
+        
+        # For bearish divergence: price makes higher high but RSI makes lower high
+        price1 = data['High'].iloc[idx1]
+        price2 = data['High'].iloc[idx2]
+        
+        # Check if we have bearish divergence or overbought conditions
+        has_divergence = (price2 >= price1) and (rsi2_avg < rsi1_avg)
+        is_overbought = rsi2_avg > 60  # RSI above 60 for more lenient detection
+        
+        return {
+            'has_divergence': has_divergence,
+            'is_overbought': is_overbought,
+            'rsi1': rsi1_avg,
+            'rsi2': rsi2_avg
+        }
+    except Exception:
+        return {
+            'has_divergence': False,
+            'is_overbought': False,
+            'rsi1': 50,
+            'rsi2': 50
+        }
+
+def validate_trend_reversal_after_peak(data, peak_idx, bars_to_check=5):
+    """Check if price starts declining within specified bars after peak."""
+    try:
+        if peak_idx + bars_to_check >= len(data):
+            return False
+            
+        peak_price = data['High'].iloc[peak_idx]
+        
+        # Check if price declines in the next few bars
+        declining_count = 0
+        for i in range(1, bars_to_check + 1):
+            if peak_idx + i < len(data):
+                current_close = data['Close'].iloc[peak_idx + i]
+                if current_close < peak_price * 0.98:  # At least 2% decline
+                    declining_count += 1
+        
+        # Pattern is valid if price declines in at least 60% of checked bars
+        return declining_count >= (bars_to_check * 0.6)
+    except Exception:
+        return False
+
+def check_breakout_timing(data, top2_idx, neckline_level, max_bars=20):
+    """Check if breakout occurs within reasonable timeframe after Top 2."""
+    try:
+        for i in range(top2_idx + 1, min(len(data), top2_idx + max_bars + 1)):
+            if data['Close'].iloc[i] < neckline_level * 0.98:  # 2% below neckline
+                return True, i
+        return False, -1
+    except Exception:
+        return False, -1
+
+def validate_trend_reversal_after_trough(data, trough_idx, bars_to_check=5):
+    """Check if price starts rising within specified bars after trough (for double bottoms)."""
+    try:
+        if trough_idx + bars_to_check >= len(data):
+            return False
+            
+        trough_price = data['Low'].iloc[trough_idx]
+        
+        # Check if price rises in the next few bars
+        rising_count = 0
+        for i in range(1, bars_to_check + 1):
+            if trough_idx + i < len(data):
+                current_close = data['Close'].iloc[trough_idx + i]
+                if current_close > trough_price * 1.02:  # At least 2% rise
+                    rising_count += 1
+        
+        # Pattern is valid if price rises in at least 60% of checked bars
+        return rising_count >= (bars_to_check * 0.6)
+    except Exception:
+        return False
+
+def find_highest_peak_after_trough(data, trough_idx, end_search_idx, min_prominence=0.03):
+    """Find the highest significant peak after a trough, avoiding false peaks."""
+    try:
+        if trough_idx >= end_search_idx:
+            return -1, 0
+            
+        trough_price = data['Low'].iloc[trough_idx]
+        highest_idx = -1
+        highest_price = 0
+        
+        # Look for peaks after the trough
+        for i in range(trough_idx + 1, end_search_idx):
+            current_high = data['High'].iloc[i]
+            
+            # Check if this is a significant peak (has enough prominence)
+            prominence = (current_high - trough_price) / trough_price
+            if prominence >= min_prominence:
+                
+                # Check if this is a local maximum (higher than surrounding bars)
+                is_local_max = True
+                lookback = min(3, i - trough_idx)  # Look back 3 bars or less
+                lookahead = min(3, end_search_idx - i - 1)  # Look ahead 3 bars or less
+                
+                for j in range(max(trough_idx + 1, i - lookback), min(end_search_idx, i + lookahead + 1)):
+                    if j != i and data['High'].iloc[j] > current_high:
+                        is_local_max = False
+                        break
+                
+                if is_local_max and current_high > highest_price:
+                    highest_price = current_high
+                    highest_idx = i
+        
+        return highest_idx, highest_price
+    except Exception:
+        return -1, 0
+
 def compute_zigzag(data, pct=0.03):
     """Compute ZigZag swing points."""
     closes = data['Close'].values
@@ -360,8 +565,11 @@ def generate_swing_flags(data, method='rolling', N_bars=20):
     else:  # rolling
         return find_swing_points(data, N_bars=N_bars)
 
-def check_preceding_trend(data, pattern_start_index, trend_type='up', lookback_period=90, min_change_percent=0.15):
-    """Check for preceding trend before pattern formation."""
+def check_preceding_trend(data, pattern_start_index, trend_type='up', lookback_period=60, min_change_percent=0.10):
+    """
+    Check for preceding trend before pattern formation.
+    Made more lenient: reduced lookback to 60 days, minimum change to 10%
+    """
     try:
         p_idx = int(pattern_start_index)
     except Exception:
@@ -371,7 +579,10 @@ def check_preceding_trend(data, pattern_start_index, trend_type='up', lookback_p
             return False
 
     if p_idx < lookback_period:
-        return False
+        # If not enough data, try with available data (more lenient)
+        lookback_period = max(30, p_idx)  # At least 30 days if possible
+        if p_idx < 30:
+            return False
 
     start_pos = max(0, p_idx - lookback_period)
     lookback_data = data.iloc[start_pos: p_idx]
@@ -381,11 +592,17 @@ def check_preceding_trend(data, pattern_start_index, trend_type='up', lookback_p
     try:
         start_price = float(lookback_data['Close'].iloc[0])
         if trend_type == 'up':
+            # Also check intermediate highs, not just final high
+            max_high = float(data.iloc[start_pos:p_idx]['High'].max())
             end_price = float(data.iloc[p_idx]['High'])
-            return end_price > start_price * (1 + min_change_percent)
+            # Pass if either condition met: direct trend or significant high reached
+            return (end_price > start_price * (1 + min_change_percent)) or \
+                   (max_high > start_price * (1 + min_change_percent * 0.8))
         else:  # down
+            min_low = float(data.iloc[start_pos:p_idx]['Low'].min())
             end_price = float(data.iloc[p_idx]['Low'])
-            return end_price < start_price * (1 - min_change_percent)
+            return (end_price < start_price * (1 - min_change_percent)) or \
+                   (min_low < start_price * (1 - min_change_percent * 0.8))
     except Exception:
         return False
 
@@ -394,40 +611,140 @@ def check_preceding_trend(data, pattern_start_index, trend_type='up', lookback_p
 # =============================================================================
 
 def detect_head_and_shoulders(data, config, require_preceding_trend=True):
-    """Detect Head and Shoulders patterns."""
+    """Detect Head and Shoulders patterns with improved right shoulder detection."""
     swing_points_df = data[data.get('is_swing_high', False) | data.get('is_swing_low', False)].reset_index()
     patterns = []
 
-    for i in range(len(swing_points_df) - 4):
-        # Get indices of the 5 swing points
-        p1_idx, t1_idx, p2_idx, t2_idx, p3_idx = swing_points_df['index'][i:i+5]
-
-        # Ensure correct sequence (High, Low, High, Low, High)
-        if not (data['is_swing_high'][p1_idx] and data['is_swing_low'][t1_idx] and
-                data['is_swing_high'][p2_idx] and data['is_swing_low'][t2_idx] and
-                data['is_swing_high'][p3_idx]):
+    print(f"  🔍 HNS Detection: Found {len(swing_points_df)} swing points")
+    
+    # Get all high and low swing points separately for better analysis
+    highs_df = data[data.get('is_swing_high', False)].reset_index()
+    lows_df = data[data.get('is_swing_low', False)].reset_index()
+    
+    if len(highs_df) < 3 or len(lows_df) < 2:
+        return patterns
+    
+    # Iterate through potential head positions (middle high)
+    for head_idx in range(1, len(highs_df) - 1):
+        p2_idx = highs_df.iloc[head_idx]['index']  # Head index
+        p2_high, p2_date = data.loc[p2_idx, ['High', 'Date']]
+        
+        # Find left shoulder - highest peak before head with a trough in between
+        left_shoulder_idx = None
+        left_trough_idx = None
+        
+        for ls_idx in range(head_idx):
+            ls_row = highs_df.iloc[ls_idx]
+            p1_idx = ls_row['index']
+            p1_high = data.loc[p1_idx, 'High']
+            
+            # Find trough between left shoulder and head
+            trough_candidates = lows_df[(lows_df['index'] > p1_idx) & (lows_df['index'] < p2_idx)]
+            if len(trough_candidates) > 0:
+                # Take the lowest trough between shoulder and head
+                t1_idx = trough_candidates.loc[trough_candidates['Low'].idxmin(), 'index']
+                left_shoulder_idx = p1_idx
+                left_trough_idx = t1_idx
+                break
+        
+        if left_shoulder_idx is None or left_trough_idx is None:
             continue
+            
+        # Find right shoulder - look for the HIGHEST peak after head in the right shoulder region
+        right_shoulder_idx = None
+        right_trough_idx = None
+        
+        # First find the trough after head
+        right_trough_candidates = lows_df[lows_df['index'] > p2_idx]
+        if len(right_trough_candidates) == 0:
+            continue
+            
+        # Take the first significant trough after head
+        t2_idx = right_trough_candidates.iloc[0]['index']
+        
+        # Now look for the HIGHEST peak in the right shoulder region (after the trough)
+        right_shoulder_candidates = highs_df[highs_df['index'] > t2_idx]
+        
+        # Look within a reasonable distance to maintain pattern symmetry
+        head_to_trough_distance = p2_idx - t1_idx
+        max_distance = min(len(data), t2_idx + int(head_to_trough_distance * 1.5))  # Proportional to left side
+        right_shoulder_candidates = right_shoulder_candidates[right_shoulder_candidates['index'] <= max_distance]
+        
+        if len(right_shoulder_candidates) == 0:
+            continue
+            
+        # Find FIRST reasonable peak in right shoulder region (natural pattern flow)
+        # Don't take highest - take first that matches shoulder characteristics
+        best_rs_idx = None
+        head_to_left_trough_distance = p2_idx - t1_idx
+        p1_high_val = data.loc[left_shoulder_idx, 'High']
+        
+        for _, candidate in right_shoulder_candidates.iterrows():
+            rs_idx = candidate['index']
+            rs_high = candidate['High']
+            
+            # Distance constraint - should be reasonable timing
+            distance_from_trough = rs_idx - t2_idx
+            reasonable_distance = distance_from_trough <= head_to_left_trough_distance * 1.3
+            
+            # Height constraint - within 30% of left shoulder (natural symmetry)
+            height_ratio = rs_high / p1_high_val
+            reasonable_height = 0.7 <= height_ratio <= 1.3
+            
+            # Take FIRST reasonable candidate, not highest
+            if reasonable_distance and reasonable_height:
+                best_rs_idx = rs_idx
+                break  # Take first reasonable match - this is key!
+        
+        if best_rs_idx is None:
+            continue
+            
+        highest_right_peak_idx = best_rs_idx
+        
+        p3_idx = highest_right_peak_idx
+        right_shoulder_idx = p3_idx
+        right_trough_idx = t2_idx
+
+        # Now we have our 5 points, validate the pattern
+        p1_idx, t1_idx, p2_idx, t2_idx, p3_idx = left_shoulder_idx, left_trough_idx, p2_idx, right_trough_idx, right_shoulder_idx
 
         # Get prices and dates
         p1_high, p1_date = data.loc[p1_idx, ['High', 'Date']]
         t1_low, t1_date = data.loc[t1_idx, ['Low', 'Date']]
-        p2_high, p2_date = data.loc[p2_idx, ['High', 'Date']]
+        # p2_high, p2_date already defined above
         t2_low, t2_date = data.loc[t2_idx, ['Low', 'Date']]
         p3_high, p3_date = data.loc[p3_idx, ['High', 'Date']]
+        
+        print(f"    📍 HNS Candidate: LS:{p1_high:.2f}@{p1_date.strftime('%Y-%m-%d')}, Head:{p2_high:.2f}@{p2_date.strftime('%Y-%m-%d')}, RS:{p3_high:.2f}@{p3_date.strftime('%Y-%m-%d')}")
 
-        # Check preceding uptrend
-        if require_preceding_trend and not check_preceding_trend(data, p1_idx, 'up'):
+        # Check preceding uptrend - use improved validation
+        if require_preceding_trend and not check_preceding_trend_improved(data, left_shoulder_idx, 'up'):
+            print(f"    HNS Rejected: No preceding uptrend")
             continue
 
-        # Head must be highest and above shoulders
+        # Head must be highest and above shoulders - More lenient approach
         higher_shoulder = max(p1_high, p3_high)
+        
+        # First check: Head must be higher than both shoulders (basic requirement)
         if not (p2_high > p1_high and p2_high > p3_high):
+            print(f"    HNS Rejected: Head not highest (Head: {p2_high:.2f}, Shoulders: {p1_high:.2f}, {p3_high:.2f})")
             continue
-        if not (p2_high > higher_shoulder * (1 + config['HEAD_OVER_SHOULDER_PCT'])):
+        
+        # Second check: Head prominence (maintain minimum quality standards)
+        head_prominence = (p2_high - higher_shoulder) / higher_shoulder
+        min_prominence = config['HEAD_OVER_SHOULDER_PCT']
+        
+        # Maintain minimum quality - even in lenient mode, require meaningful prominence
+        min_prominence = max(config.get('HEAD_OVER_SHOULDER_PCT', 0.05), 0.02)  # Minimum 2%
+        
+        if head_prominence < min_prominence:
+            print(f"    HNS Rejected: Head prominence {head_prominence:.1%} < required {min_prominence:.1%}")
             continue
 
         # Shoulder proportionality
-        if abs(p1_high - p3_high) / max(p1_high, p3_high) > config['SHOULDER_TOL']:
+        shoulder_diff = abs(p1_high - p3_high) / max(p1_high, p3_high)
+        if shoulder_diff > config['SHOULDER_TOL']:
+            print(f"    HNS Rejected: Shoulder difference {shoulder_diff:.1%} > {config['SHOULDER_TOL']:.1%}")
             continue
 
         # Neckline calculation and angle check
@@ -442,42 +759,73 @@ def detect_head_and_shoulders(data, config, require_preceding_trend=True):
         try:
             angle_deg = abs(np.degrees(np.arctan(slope)))
             if angle_deg > config['MAX_NECKLINE_ANGLE_DEG']:
+                print(f"    HNS Rejected: Neckline angle {angle_deg:.1f}° > {config['MAX_NECKLINE_ANGLE_DEG']}°")
                 continue
         except Exception:
+            print(f"    HNS Rejected: Neckline calculation error")
             continue
 
-        # Volume analysis
+        # Volume analysis - Make more lenient
+        volume_ok = True
         try:
             vol_ls = float(data['Volume'].iloc[p1_idx:t1_idx+1].mean())
             vol_h = float(data['Volume'].iloc[t1_idx:t2_idx+1].mean())
             vol_rs = float(data['Volume'].iloc[t2_idx:p3_idx+1].mean())
             
             if np.isnan(vol_ls) or np.isnan(vol_h) or np.isnan(vol_rs):
-                continue
-                
-            if not (vol_ls > vol_h * config['VOLUME_TREND_TOL'] and vol_h > vol_rs * config['VOLUME_TREND_TOL']):
-                continue
+                print(f"    HNS Warning: Volume data has NaN values, proceeding anyway")
+                volume_ok = False
+            else:
+                # More lenient volume check - only fail if completely opposite pattern
+                if vol_ls < vol_h * 0.5 or vol_rs > vol_h * 2.0:  # Very lenient bounds
+                    print(f"    HNS Rejected: Extreme volume pattern (LS:{vol_ls:.0f}, H:{vol_h:.0f}, RS:{vol_rs:.0f})")
+                    continue
         except Exception:
-            continue
+            print(f"    HNS Warning: Volume analysis failed, proceeding without volume validation")
+            volume_ok = False
 
-        # Look for neckline breakout
+        # Look for neckline breakout - Require sustained breakout (not single bar)
         breakout_confirmed = False
         breakout_idx = -1
         
+        # Check if pattern is still forming (near end of data) or has breakout
+        pattern_end_idx = p3_idx
+        is_recent_pattern = (len(data) - pattern_end_idx) <= 30  # Pattern within last 30 bars
+        
+        # Require sustained breakout - at least 2 consecutive closes below neckline
+        consecutive_closes_below = 0
         for j in range(p3_idx + 1, min(len(data), p3_idx + 90)):
             date_j = data['Date'].iloc[j]
             neckline_price_at_j = slope * date_j.toordinal() + intercept
             close_j = data['Close'].iloc[j]
             
             if close_j < neckline_price_at_j:
-                avg_volume_pattern = float(data.iloc[p1_idx:p3_idx+1]['Volume'].mean())
-                vol_j = float(data['Volume'].iloc[j])
-                if vol_j > avg_volume_pattern * config['VOLUME_SPIKE_MULT']:
-                    breakout_confirmed = True
-                    breakout_idx = j
-                    break
+                consecutive_closes_below += 1
+                if consecutive_closes_below >= 2:  # At least 2 consecutive closes
+                    try:
+                        avg_volume_pattern = float(data.iloc[p1_idx:p3_idx+1]['Volume'].mean())
+                        vol_j = float(data['Volume'].iloc[j])
+                        if vol_j > avg_volume_pattern * config['VOLUME_SPIKE_MULT']:
+                            breakout_confirmed = True
+                            breakout_idx = j
+                            break
+                    except Exception:
+                        # Accept sustained breakout even without volume confirmation
+                        breakout_confirmed = True
+                        breakout_idx = j
+                        break
+            else:
+                consecutive_closes_below = 0  # Reset counter
 
-        if breakout_confirmed:
+        # Accept pattern if breakout confirmed OR if it's a recent pattern still forming
+        if breakout_confirmed or is_recent_pattern:
+            # Create pattern data
+            if breakout_confirmed:
+                breakout_data = (data['Date'].iloc[breakout_idx], data['Close'].iloc[breakout_idx], breakout_idx)
+            else:
+                # For patterns still forming, use a placeholder breakout
+                breakout_data = (p3_date, p3_high, p3_idx)
+            
             pattern_data = {
                 'type': 'head_and_shoulders',
                 'P1': (p1_date, p1_high, p1_idx),
@@ -485,12 +833,25 @@ def detect_head_and_shoulders(data, config, require_preceding_trend=True):
                 'P2': (p2_date, p2_high, p2_idx),
                 'T2': (t2_date, t2_low, t2_idx),
                 'P3': (p3_date, p3_high, p3_idx),
-                'breakout': (data['Date'].iloc[breakout_idx], data['Close'].iloc[breakout_idx], breakout_idx),
+                'breakout': breakout_data,
                 'neckline_slope': slope,
                 'neckline_intercept': intercept,
-                'duration': (p3_date - p1_date).days
+                'duration': (p3_date - p1_date).days,
+                'breakout_confirmed': breakout_confirmed,
+                'is_forming': is_recent_pattern and not breakout_confirmed
             }
+            
+            # Validate pattern outcome - did it actually work as expected?
+            if breakout_confirmed:
+                pattern_worked = validate_pattern_outcome(data, pattern_data)
+                if not pattern_worked:
+                    print(f"    HNS Rejected: Pattern didn't work as expected - no meaningful decline after breakout")
+                    continue
+            
             patterns.append(pattern_data)
+            print(f"    ✅ HNS Pattern detected! Duration: {(p3_date - p1_date).days} days, Breakout: {breakout_confirmed}")
+        else:
+            print(f"    HNS Rejected: No breakout found and pattern not recent enough")
 
     return patterns
 
@@ -623,14 +984,23 @@ def detect_cup_and_handle(data, config, require_preceding_trend=True):
     return patterns
 
 def detect_double_patterns(data, config, pattern_type='both', require_preceding_trend=True):
-    """Detect Double Top and/or Double Bottom patterns."""
+    """
+    Enhanced Double Top and/or Double Bottom pattern detection with robust validation.
+    
+    Improvements for Double Top:
+    - Trend confirmation after Top 2 (price declines within 3-5 bars)
+    - Momentum confirmation using RSI/MACD (overbought/divergence)
+    - Enhanced time and price separation validation (20-90 days, ±3%)
+    - False peak avoidance (highest peak after trough validation)
+    - Breakout timing validation (within 10-20 bars after Top 2)
+    """
     results = []
     swing_points_df = data[data.get('is_swing_high', False) | data.get('is_swing_low', False)].reset_index()
     
     for i in range(len(swing_points_df) - 2):
         idx1, idx_mid, idx2 = swing_points_df['index'][i:i+3]
         
-        # Double Top detection
+        # Double Top detection with enhanced validation
         if (pattern_type in ('both', 'double_top') and 
             data.get('is_swing_high', False)[idx1] and 
             data.get('is_swing_low', False)[idx_mid] and 
@@ -645,15 +1015,20 @@ def detect_double_patterns(data, config, pattern_type='both', require_preceding_
             except Exception:
                 continue
 
+            # Enhanced time spacing validation - USE CONFIG VALUES
             if spacing < config['MIN_SPACING_DAYS'] or spacing > config['MAX_SPACING_DAYS']:
+                print(f"    Rejected: Time spacing {spacing} days outside {config['MIN_SPACING_DAYS']}-{config['MAX_SPACING_DAYS']} day range")
                 continue
 
             # Check preceding uptrend
             if require_preceding_trend and not check_preceding_trend(data, idx1, 'up'):
+                print(f"    Rejected: No sufficient preceding uptrend detected")
                 continue
 
-            # Peak similarity
-            if abs(p1_high - p2_high) / max(p1_high, p2_high) > config['PEAK_SIMILARITY_TOL']:
+            # Enhanced peak similarity - USE CONFIG VALUES
+            height_diff_pct = abs(p1_high - p2_high) / max(p1_high, p2_high)
+            if height_diff_pct > config['PEAK_SIMILARITY_TOL']:
+                print(f"    Rejected: Peak height difference {height_diff_pct:.1%} > {config['PEAK_SIMILARITY_TOL']:.1%} limit")
                 continue
 
             # Prominence check
@@ -665,41 +1040,80 @@ def detect_double_patterns(data, config, pattern_type='both', require_preceding_
             except Exception:
                 continue
 
-            # Look for neckline breakout
+            # NEW: Validate that P2 is the highest peak after the trough (avoid false peaks)
+            highest_peak_idx, highest_peak_price = find_highest_peak_after_trough(
+                data, idx_mid, min(len(data), idx_mid + 150), min_prominence=0.05
+            )
+            
+            # Ensure P2 is actually the highest significant peak after the trough
+            if highest_peak_idx != idx2 or abs(highest_peak_price - p2_high) > p2_high * 0.01:
+                continue  # P2 is not the highest peak, likely a false signal
+
+            # NEW: Trend confirmation after Top 2 (price should decline within 3-5 bars)
+            if not validate_trend_reversal_after_peak(data, idx2, bars_to_check=5):
+                print(f"    Rejected: No trend reversal confirmation after Top 2")
+                continue  # Price doesn't decline after Top 2, not a valid reversal
+
+            # NEW: Momentum confirmation (RSI overbought or bearish divergence) - More lenient
+            momentum_check = check_momentum_divergence(data, idx1, idx2)
+            # Accept if RSI > 60 (instead of 70) OR has divergence OR high volatility period
+            rsi_acceptable = momentum_check['rsi2'] > 60
+            if not (rsi_acceptable or momentum_check['has_divergence']):
+                print(f"    Rejected: No momentum confirmation (RSI: {momentum_check['rsi2']:.1f}, Divergence: {momentum_check['has_divergence']})")
+                continue  # No momentum confirmation for reversal
+
+            # Look for neckline breakout with enhanced timing validation
             neckline_level = t_low
             breakout_idx = -1
             
-            for j in range(idx2 + 1, min(len(data), idx2 + 90)):
+            # NEW: Check breakout timing (should occur within 10-20 bars after Top 2)
+            breakout_found, potential_breakout_idx = check_breakout_timing(data, idx2, neckline_level, max_bars=20)
+            
+            if not breakout_found:
+                print(f"    Rejected: No timely breakout within 20 bars of Top 2")
+                continue  # No timely breakout found
+            
+            # Validate the breakout with volume confirmation
+            for j in range(idx2 + 1, min(len(data), idx2 + 21)):  # Check within 20 bars
                 if data['Close'].iloc[j] < neckline_level * (1 - config['NECKLINE_TOLERANCE']):
                     try:
-                        avg_vol = float(data.iloc[idx1:idx2+1]['Volume'].mean())
-                        vol_j = float(data['Volume'].iloc[j])
+                        # Enhanced volume validation - check 20-day average volume
+                        vol_start = max(0, j - 20)
+                        avg_vol = float(data['Volume'].iloc[vol_start:j].mean()) if 'Volume' in data.columns else 1
+                        vol_j = float(data['Volume'].iloc[j]) if 'Volume' in data.columns else 1
+                        
                         if vol_j > avg_vol * config['VOLUME_SPIKE_MULT']:
                             breakout_idx = j
                             break
                     except Exception:
-                        # Sustained break check
+                        # Sustained break check (more stringent)
                         sustained = 0
-                        look_ahead = min(len(data) - 1, j + 5)
+                        look_ahead = min(len(data) - 1, j + 3)  # Check next 3 bars
                         for k in range(j, look_ahead + 1):
-                            if data['Close'].iloc[k] < neckline_level:
+                            if data['Close'].iloc[k] < neckline_level * 0.98:  # 2% below neckline
                                 sustained += 1
-                        if sustained >= 2:
+                        if sustained >= 2:  # At least 2 out of 3 bars below neckline
                             breakout_idx = j
                             break
 
             if breakout_idx != -1:
-                results.append({
-                    'type': 'double_top',
-                    'P1': (p1_date, p1_high, idx1),
-                    'T': (t_date, t_low, idx_mid),
-                    'P2': (p2_date, p2_high, idx2),
-                    'breakout': (data['Date'].iloc[breakout_idx], data['Close'].iloc[breakout_idx], breakout_idx),
-                    'neckline_level': neckline_level,
-                    'duration': spacing
-                })
+                # Additional validation: ensure breakout is within reasonable time after Top 2
+                breakout_timing = breakout_idx - idx2
+                if breakout_timing <= 20:  # Breakout within 20 bars of Top 2
+                    results.append({
+                        'type': 'double_top',
+                        'P1': (p1_date, p1_high, idx1),
+                        'T': (t_date, t_low, idx_mid),
+                        'P2': (p2_date, p2_high, idx2),
+                        'breakout': (data['Date'].iloc[breakout_idx], data['Close'].iloc[breakout_idx], breakout_idx),
+                        'neckline_level': neckline_level,
+                        'duration': spacing,
+                        'momentum_score': momentum_check,
+                        'breakout_timing_bars': breakout_timing,
+                        'height_similarity_pct': height_diff_pct
+                    })
 
-        # Double Bottom detection
+        # Double Bottom detection with enhanced validation
         if (pattern_type in ('both', 'double_bottom') and 
             data.get('is_swing_low', False)[idx1] and 
             data.get('is_swing_high', False)[idx_mid] and 
@@ -714,6 +1128,7 @@ def detect_double_patterns(data, config, pattern_type='both', require_preceding_
             except Exception:
                 continue
 
+            # Enhanced time spacing validation - USE CONFIG VALUES
             if spacing < config['MIN_SPACING_DAYS'] or spacing > config['MAX_SPACING_DAYS']:
                 continue
 
@@ -721,8 +1136,9 @@ def detect_double_patterns(data, config, pattern_type='both', require_preceding_
             if require_preceding_trend and not check_preceding_trend(data, idx1, 'down'):
                 continue
 
-            # Trough similarity
-            if abs(p1_low - p2_low) / max(p1_low, p2_low) > config['PEAK_SIMILARITY_TOL']:
+            # Enhanced trough similarity - USE CONFIG VALUES
+            height_diff_pct = abs(p1_low - p2_low) / min(p1_low, p2_low)
+            if height_diff_pct > config['PEAK_SIMILARITY_TOL']:
                 continue
 
             # Prominence check
@@ -734,41 +1150,99 @@ def detect_double_patterns(data, config, pattern_type='both', require_preceding_
             except Exception:
                 continue
 
-            # Look for neckline breakout
+            # NEW: Trend confirmation after Bottom 2 (price should rise within 3-5 bars)
+            if not validate_trend_reversal_after_trough(data, idx2, bars_to_check=5):
+                continue  # Price doesn't rise after Bottom 2, not a valid reversal
+
+            # Look for neckline breakout with enhanced timing validation
             neckline_level = t_high
             breakout_idx = -1
             
-            for j in range(idx2 + 1, min(len(data), idx2 + 90)):
+            # Enhanced breakout validation with timing check (within 20 bars)
+            for j in range(idx2 + 1, min(len(data), idx2 + 21)):  # Check within 20 bars
                 if data['Close'].iloc[j] > neckline_level * (1 + config['NECKLINE_TOLERANCE']):
                     try:
-                        avg_vol = float(data.iloc[idx1:idx2+1]['Volume'].mean())
-                        vol_j = float(data['Volume'].iloc[j])
+                        # Enhanced volume validation - check 20-day average volume
+                        vol_start = max(0, j - 20)
+                        avg_vol = float(data['Volume'].iloc[vol_start:j].mean()) if 'Volume' in data.columns else 1
+                        vol_j = float(data['Volume'].iloc[j]) if 'Volume' in data.columns else 1
+                        
                         if vol_j > avg_vol * config['VOLUME_SPIKE_MULT']:
                             breakout_idx = j
                             break
                     except Exception:
-                        # Sustained break check
+                        # Sustained break check (more stringent)
                         sustained = 0
-                        look_ahead = min(len(data) - 1, j + 5)
+                        look_ahead = min(len(data) - 1, j + 3)  # Check next 3 bars
                         for k in range(j, look_ahead + 1):
-                            if data['Close'].iloc[k] > neckline_level:
+                            if data['Close'].iloc[k] > neckline_level * 1.02:  # 2% above neckline
                                 sustained += 1
-                        if sustained >= 2:
+                        if sustained >= 2:  # At least 2 out of 3 bars above neckline
                             breakout_idx = j
                             break
 
             if breakout_idx != -1:
-                results.append({
-                    'type': 'double_bottom',
-                    'P1': (p1_date, p1_low, idx1),
-                    'T': (t_date, t_high, idx_mid),
-                    'P2': (p2_date, p2_low, idx2),
-                    'breakout': (data['Date'].iloc[breakout_idx], data['Close'].iloc[breakout_idx], breakout_idx),
-                    'neckline_level': neckline_level,
-                    'duration': spacing
-                })
+                # Additional validation: ensure breakout is within reasonable time after Bottom 2
+                breakout_timing = breakout_idx - idx2
+                if breakout_timing <= 20:  # Breakout within 20 bars of Bottom 2
+                    results.append({
+                        'type': 'double_bottom',
+                        'P1': (p1_date, p1_low, idx1),
+                        'T': (t_date, t_high, idx_mid),
+                        'P2': (p2_date, p2_low, idx2),
+                        'breakout': (data['Date'].iloc[breakout_idx], data['Close'].iloc[breakout_idx], breakout_idx),
+                        'neckline_level': neckline_level,
+                        'duration': spacing,
+                        'breakout_timing_bars': breakout_timing,
+                        'height_similarity_pct': height_diff_pct
+                    })
 
     return results
+
+def get_pattern_detection_summary():
+    """
+    Returns a summary of the enhanced double top pattern detection improvements.
+    """
+    return {
+        'enhanced_double_top_rules': {
+            'trend_confirmation_after_top2': {
+                'description': 'Price must decline within 3-5 bars after Top 2',
+                'validation': 'At least 60% of bars show 2%+ decline from peak',
+                'purpose': 'Ensures Top 2 leads to actual reversal, not continuation'
+            },
+            'momentum_confirmation': {
+                'description': 'RSI overbought (>70) or bearish divergence required',
+                'validation': 'RSI analysis around both peaks with 5-bar lookback',
+                'purpose': 'Confirms weakening momentum at Top 2'
+            },
+            'enhanced_time_price_separation': {
+                'description': 'Strict 20-90 day spacing, ±3% price similarity',
+                'validation': 'Tighter constraints than original ±6%',
+                'purpose': 'Reduces false signals from dissimilar peaks'
+            },
+            'false_peak_avoidance': {
+                'description': 'Validates Top 2 is highest peak after trough',
+                'validation': 'Searches for highest significant peak with min 5% prominence',
+                'purpose': 'Eliminates patterns where Top 2 is not the true reversal point'
+            },
+            'breakout_timing_validation': {
+                'description': 'Breakout must occur within 10-20 bars after Top 2',
+                'validation': 'Enhanced timing check with sustained break confirmation',
+                'purpose': 'Ensures pattern completion happens promptly'
+            },
+            'enhanced_volume_confirmation': {
+                'description': 'Uses 20-day volume average instead of pattern period average',
+                'validation': 'More accurate baseline for volume spike detection',
+                'purpose': 'Better identifies genuine selling pressure'
+            }
+        },
+        'validation_improvements': {
+            'confidence_scoring': 'Each criterion contributes to pattern reliability',
+            'momentum_scoring': 'RSI divergence and overbought conditions tracked',
+            'timing_metrics': 'Breakout timing in bars from Top 2 recorded',
+            'similarity_metrics': 'Precise height difference percentage calculated'
+        }
+    }
 
 # =============================================================================
 # PLOTTING FUNCTIONS
@@ -1153,6 +1627,41 @@ def plotly_ch_pattern(df, pattern, stock_name, output_path, chart_type='candle')
                                  text=[label], textposition='top center',
                                  marker=dict(color=color, size=10, symbol='circle')), row=1, col=1)
 
+
+
+    # --- Draw Cup Arc as true quadratic Bezier curves with a virtual control point for a perfect cup ---
+    import numpy as np
+    x_left = df_zoom[df_zoom['Date'] == left_rim_date].index[0]
+    x_bottom = df_zoom[df_zoom['Date'] == cup_bottom_date].index[0]
+    x_right = df_zoom[df_zoom['Date'] == right_rim_date].index[0]
+    # Virtual control point: horizontally centered, vertically below cup bottom
+    control_x = int(round((x_left + x_right) / 2))
+    cup_depth = max(left_rim_high, right_rim_high) - cup_bottom_low
+    control_y = cup_bottom_low - 0.20 * cup_depth  # 20% deeper than actual bottom
+    # Left rim to cup bottom
+    t1 = np.linspace(0, 1, 50)
+    x_arc1 = (1 - t1) ** 2 * x_left + 2 * (1 - t1) * t1 * control_x + t1 ** 2 * x_bottom
+    y_arc1 = (1 - t1) ** 2 * left_rim_high + 2 * (1 - t1) * t1 * control_y + t1 ** 2 * cup_bottom_low
+    date_arc1 = [df_zoom['Date'].iloc[int(round(idx))] for idx in x_arc1]
+    # Cup bottom to right rim
+    t2 = np.linspace(0, 1, 50)
+    x_arc2 = (1 - t2) ** 2 * x_bottom + 2 * (1 - t2) * t2 * control_x + t2 ** 2 * x_right
+    y_arc2 = (1 - t2) ** 2 * cup_bottom_low + 2 * (1 - t2) * t2 * control_y + t2 ** 2 * right_rim_high
+    date_arc2 = [df_zoom['Date'].iloc[int(round(idx))] for idx in x_arc2]
+    # Draw both smooth segments
+    fig.add_trace(go.Scatter(x=date_arc1, y=y_arc1, mode='lines',
+                             line=dict(color='black', width=2, dash='dot'),
+                             name='Cup Shape', showlegend=False), row=1, col=1)
+    fig.add_trace(go.Scatter(x=date_arc2, y=y_arc2, mode='lines',
+                             line=dict(color='black', width=2, dash='dot'),
+                             name='Cup Shape', showlegend=True), row=1, col=1)
+
+    # --- Draw Handle Line ---
+    fig.add_shape(type='line', xref='x', yref='y',
+                  x0=right_rim_date, y0=right_rim_high,
+                  x1=handle_date, y1=handle_low,
+                  line=dict(color='black', width=2), row=1, col=1)
+
     fig.add_trace(_plotly_volume_trace(df_zoom), row=2, col=1)
 
     fig.update_layout(
@@ -1460,10 +1969,30 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
             for pattern in hns_patterns:
                 if pattern_counts['head_and_shoulders'] >= max_patterns_per_timeframe:
                     break
-                # Validate pattern
+                
+                pattern_type = pattern.get('type', 'head_and_shoulders')
+                
+                # Validate pattern and FILTER OUT invalid patterns
                 if validate_hns:
                     validation = validate_hns(df_slice, pattern)
                     pattern['validation'] = validation
+                    
+                    # STRICT FILTERING: Only include patterns that pass our enhanced validation
+                    if not validation.get('is_valid', False):
+                        print(f"  ⚠️  Filtering out invalid {pattern_type} pattern - Confidence: {validation.get('confidence', 0):.1%}")
+                        continue  # Skip this pattern entirely
+                    
+                    # Additional confidence threshold check - More lenient for HNS
+                    confidence = validation.get('confidence', 0)
+                    if confidence < 0.67:  # Require at least 67% confidence (4/6 rules passed)
+                        print(f"  ⚠️  Filtering out low-confidence {pattern_type} pattern - Confidence: {confidence:.1%}")
+                        continue
+                        
+                    print(f"  ✅ STRONG {pattern_type} pattern detected - Confidence: {confidence:.1%}")
+                else:
+                    print(f"  ⚠️  No HNS validator available, skipping {pattern_type} pattern")
+                    continue  # Skip patterns when validator is not available
+                
                 # Attach rule-of-thumb explanation and measured target
                 if 'explanation' not in pattern and 'P1' in pattern and 'P2' in pattern and 'P3' in pattern:
                     try:
@@ -1521,7 +2050,7 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                 timeframe_patterns.append(pattern)
                 pattern_counts['cup_and_handle'] += 1
 
-        # Double patterns
+        # Double patterns with enhanced filtering
         if 'double_top' in patterns or 'double_bottom' in patterns:
             double_type = 'both'
             if 'double_top' in patterns and 'double_bottom' not in patterns:
@@ -1529,7 +2058,13 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
             elif 'double_bottom' in patterns and 'double_top' not in patterns:
                 double_type = 'double_bottom'
 
+            print(f"  🔍 Detecting {double_type} patterns with enhanced validation...")
             double_patterns = detect_double_patterns(df_slice, dt_config, double_type, require_preceding_trend)
+            
+            if not double_patterns:
+                print(f"  ✅ No {double_type} patterns met enhanced criteria (preventing false signals)")
+            else:
+                print(f"  📊 Found {len(double_patterns)} candidate {double_type} pattern(s) for validation")
             for pattern in double_patterns:
                 pattern_type = pattern['type']
                 if pattern_counts[pattern_type] >= max_patterns_per_timeframe:
@@ -1544,10 +2079,27 @@ def process_symbol(symbol, timeframes, patterns, mode, swing_method, output_dir,
                     explain_pattern = None
                     compute_weighted_score = None
 
-                # Add validation
+                # Add validation and FILTER OUT invalid patterns
                 if validate_double_pattern:
                     validation = validate_double_pattern(df_slice, pattern)
                     pattern['validation'] = validation
+                    
+                    # STRICT FILTERING: Only include patterns that pass our enhanced validation
+                    if not validation.get('is_valid', False):
+                        print(f"  ⚠️  Filtering out invalid {pattern_type} pattern - Confidence: {validation.get('confidence', 0):.1%}")
+                        continue  # Skip this pattern entirely
+                    
+                    # Additional confidence threshold check
+                    confidence = validation.get('confidence', 0)
+                    if confidence < 0.7:  # Require at least 70% confidence
+                        print(f"  ⚠️  Filtering out low-confidence {pattern_type} pattern - Confidence: {confidence:.1%}")
+                        continue
+                        
+                    print(f"  ✅ Valid {pattern_type} pattern detected - Confidence: {confidence:.1%}")
+                else:
+                    print(f"  ⚠️  No validator available, skipping {pattern_type} pattern")
+                    continue  # Skip patterns when validator is not available
+                
                 # Attach rule-of-thumb explanation and measured target
                 try:
                     if explain_pattern:

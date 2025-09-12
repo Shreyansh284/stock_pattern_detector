@@ -7,11 +7,20 @@ import { useDetectStore } from '../store/useDetectStore'
 export default function Detect() {
     const s = useDetectStore()
     const [q, setQ] = useState('')
+    // If dataSource is 'past', show only local CSV symbols from StockData
+    const localCsvSymbols = [
+        '360ONE', '3MINDIA', 'AARTIIND', 'AAVAS', 'ABB', 'ABBOTINDIA', 'ABCAPITAL', 'ABFRL', 'ACC', 'ACE', 'ACI', 'ADANIENSOL', 'ADANIENT', 'ADANIGREEN', 'ADANIPORTS', 'ADANIPOWER', 'AETHER', 'AFFLE', 'AIAENG', 'AJANTPHARM', 'ALKEM', 'ALKYLAMINE', 'ALLCARGO', 'ALOKINDS', 'AMBER', 'AMBUJACEM', 'ANANDRATHI', 'ANGELONE', 'ANURAS', 'APARINDS', 'APLAPOLLO', 'APLLTD', 'APOLLOHOSP', 'APOLLOTYRE', 'APTUS', 'ARE&M', 'ASAHIINDIA', 'ASHOKLEY', 'ASIANPAINT', 'ASTERDM', 'ASTRAL', 'ASTRAZEN', 'ATGL', 'ATUL', 'AUBANK', 'AUROPHARMA', 'AVANTIFEED', 'AWL', 'AXISBANK', 'BAJAJ-AUTO', 'BAJAJFINSV', 'BAJAJHLDNG', 'BAJFINANCE', 'BALAMINES', 'BALKRISIND', 'BALRAMCHIN', 'BANDHANBNK', 'BANKBARODA', 'BANKINDIA', 'BATAINDIA', 'BAYERCROP', 'BBTC', 'BDL', 'BEL', 'BEML', 'BERGEPAINT', 'BHARATFORG', 'BHARTIARTL', 'BHEL', 'BIKAJI', 'BIOCON', 'BIRLACORPN', 'BLS', 'BLUEDART', 'BLUESTARCO', 'BORORENEW', 'BOSCHLTD', 'BPCL', 'BRIGADE', 'BRITANNIA', 'BSE', 'BSOFT', 'CAMPUS', 'CAMS', 'CANBK', 'CANFINHOME', 'CAPLIPOINT', 'CARBORUNIV', 'CASTROLIND', 'CCL', 'CDSL', 'CEATLTD', 'CELLO', 'CENTRALBK', 'CENTURYPLY', 'CENTURYTEX', 'CERA', 'CESC', 'CGCL', 'CGPOWER', 'CHALET', 'CHAMBLFERT', 'CHEMPLASTS', 'CHENNPETRO', 'CHOLAFIN', 'CHOLAHLDNG', 'CIEINDIA', 'CIPLA', 'CLEAN', 'COALINDIA', 'COCHINSHIP', 'COFORGE', 'COLPAL', 'CONCOR', 'CONCORDBIO', 'COROMANDEL', 'CRAFTSMAN', 'CREDITACC', 'CRISIL', 'CROMPTON', 'CSBBANK', 'CUB', 'CUMMINSIND', 'CYIENT', 'DABUR', 'DALBHARAT', 'DATAPATTNS', 'DCMSHRIRAM', 'DEEPAKFERT', 'DEEPAKNTR', 'DELHIVERY', 'DEVYANI', 'DIVISLAB', 'DIXON', 'DLF', 'DMART', 'DOMS', 'DRREDDY', 'EASEMYTRIP', 'ECLERX', 'EICHERMOT', 'EIDPARRY', 'EIHOTEL', 'ELECON', 'ELGIEQUIP', 'EMAMILTD', 'ENDURANCE', 'ENGINERSIN', 'EPL', 'EQUITASBNK', 'ERIS', 'ESCORTS', 'EXIDEIND', 'FACT', 'FDC', 'FEDERALBNK', 'FINCABLES', 'FINEORG', 'FINPIPE', 'FIVESTAR', 'FLUOROCHEM'
+        // ...add all other symbols as needed
+    ];
     const filteredStocks = useMemo(() => {
-        if (!q.trim()) return s.stocks
-        const qq = q.toLowerCase()
-        return s.stocks.filter(x => x.toLowerCase().includes(qq))
-    }, [q, s.stocks])
+        let stocks = s.stocks;
+        if (s.dataSource === 'past') {
+            stocks = localCsvSymbols;
+        }
+        if (!q.trim()) return stocks;
+        const qq = q.toLowerCase();
+        return stocks.filter(x => x.toLowerCase().includes(qq));
+    }, [q, s.stocks, s.dataSource]);
 
     useEffect(() => {
         if (!s.stocks.length) s.init()
@@ -51,13 +60,13 @@ export default function Detect() {
     }, [])
 
     return (
-        <section className="max-w-7xl mx-auto p-6">
+        <section className="max-w-8xl mx-9 pt-4 pb-4">
             <div className="mb-6">
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Detect Chart Patterns</h1>
                 <p className="text-slate-600 mt-1">Pick a symbol, pattern and timeframes. We’ll render interactive charts inline.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-y-6 gap-x-3">
                 <aside className="lg:col-span-1 space-y-4">
                     <div className="rounded-xl border bg-white shadow-sm">
                         <div className="p-4 border-b">
@@ -65,8 +74,11 @@ export default function Detect() {
                             <input
                                 type="text"
                                 placeholder="Search symbols…"
-                                value={q}
-                                onChange={(e) => setQ(e.target.value)}
+                                value={s.selectedStock ? s.selectedStock : q}
+                                onChange={(e) => {
+                                    setQ(e.target.value);
+                                    if (s.selectedStock) s.setStock(undefined);
+                                }}
                                 className="mt-2 w-full rounded-md border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
                             />
                             <div className="mt-3 max-h-56 overflow-auto border rounded-md divide-y">
@@ -98,7 +110,7 @@ export default function Detect() {
                                 label="Pattern"
                                 value={s.selectedPattern}
                                 onChange={s.setPattern}
-                                options={s.patterns.map(v => ({ value: v }))}
+                                options={[{ value: 'All', label: 'All' }, ...s.patterns.map(v => ({ value: v }))]}
                                 placeholder="Pick a pattern"
                             />
                         </div>
@@ -203,17 +215,60 @@ export default function Detect() {
                         <>
                             {Array.isArray(s.strongCharts) && s.strongCharts.length > 0 && (
                                 <div className="space-y-4">
-                                    <div className="text-sm font-semibold text-green-700">Strong patterns</div>
                                     {s.strongCharts.map((c, idx) => (
-                                        <div key={`strong-${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
-                                            <div className="px-4 py-3 border-b flex items-center justify-between">
-                                                <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                                        <details key={`strong-${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm" closed>
+                                            <summary className="px-4 py-3 border-b flex items-center justify-between cursor-pointer select-none">
+                                                <span className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</span>
                                                 <Button type="button" onClick={() => downloadChart(`chart-iframe-strong-${idx}`)} className="text-sm">Download</Button>
-                                            </div>
+                                            </summary>
                                             <div className="p-4">
                                                 <HtmlPanel html={c.html} id={`chart-iframe-strong-${idx}`} />
+                                                {/* Explanation details */}
+                                                {c.explanation && (() => {
+                                                    const exp = c.explanation;
+                                                    const rules = Array.isArray(exp?.rules) ? exp.rules : [];
+                                                    const target = exp?.target;
+                                                    return (rules.length > 0 || target) ? (
+                                                        <details className="bg-slate-50 border-t mt-4">
+                                                            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-slate-700 select-none">Details</summary>
+                                                            <div className="px-4 pb-4 pt-1 grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                                                                <div>
+                                                                    <div className="font-semibold mb-2">Validation rules</div>
+                                                                    <ul className="space-y-1 list-disc list-inside">
+                                                                        {rules.map((rul: any, i: number) => (
+                                                                            <li key={i} className={rul.passed ? 'text-green-700' : 'text-amber-700'}>
+                                                                                {rul.name}: <span className="font-mono">{rul.value}</span> (expected {rul.expected})
+                                                                                {rul.notes ? <span className="text-slate-500"> — {rul.notes}</span> : null}
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-semibold mb-2">Target calculation</div>
+                                                                    {target ? (
+                                                                        <div>
+                                                                            <div className="text-slate-700 mb-1">{target.formula}</div>
+                                                                            {Array.isArray(target.steps) && target.steps.length > 0 && (
+                                                                                <ol className="list-decimal list-inside space-y-1">
+                                                                                    {target.steps.map((s: string, i: number) => (
+                                                                                        <li key={i} className="font-mono text-slate-700">{s}</li>
+                                                                                    ))}
+                                                                                </ol>
+                                                                            )}
+                                                                            {typeof target.target_price === 'number' && (
+                                                                                <div className="mt-2 text-sm font-medium">Target price: <span className="font-mono">{target.target_price.toFixed(2)}</span></div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-slate-500">No target available</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </details>
+                                                    ) : null;
+                                                })()}
                                             </div>
-                                        </div>
+                                        </details>
                                     ))}
                                 </div>
                             )}
@@ -221,32 +276,121 @@ export default function Detect() {
                                 <div className="space-y-4">
                                     <div className="text-sm font-semibold text-amber-700">Weak patterns</div>
                                     {s.weakCharts.map((c, idx) => (
-                                        <div key={`weak-${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
-                                            <div className="px-4 py-3 border-b flex items-center justify-between">
-                                                <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                                        <details key={`weak-${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm" closed>
+                                            <summary className="px-4 py-3 border-b flex items-center justify-between cursor-pointer select-none">
+                                                <span className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</span>
                                                 <Button type="button" onClick={() => downloadChart(`chart-iframe-weak-${idx}`)} className="text-sm">Download</Button>
-                                            </div>
+                                            </summary>
                                             <div className="p-4">
                                                 <HtmlPanel html={c.html} id={`chart-iframe-weak-${idx}`} />
+                                                {/* Explanation details */}
+                                                {c.explanation && (() => {
+                                                    const exp = c.explanation;
+                                                    const rules = Array.isArray(exp?.rules) ? exp.rules : [];
+                                                    const target = exp?.target;
+                                                    return (rules.length > 0 || target) ? (
+                                                        <details className="bg-slate-50 border-t mt-4">
+                                                            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-slate-700 select-none">Details</summary>
+                                                            <div className="px-4 pb-4 pt-1 grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                                                                <div>
+                                                                    <div className="font-semibold mb-2">Validation rules</div>
+                                                                    <ul className="space-y-1 list-disc list-inside">
+                                                                        {rules.map((rul: any, i: number) => (
+                                                                            <li key={i} className={rul.passed ? 'text-green-700' : 'text-amber-700'}>
+                                                                                {rul.name}: <span className="font-mono">{rul.value}</span> (expected {rul.expected})
+                                                                                {rul.notes ? <span className="text-slate-500"> — {rul.notes}</span> : null}
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-semibold mb-2">Target calculation</div>
+                                                                    {target ? (
+                                                                        <div>
+                                                                            <div className="text-slate-700 mb-1">{target.formula}</div>
+                                                                            {Array.isArray(target.steps) && target.steps.length > 0 && (
+                                                                                <ol className="list-decimal list-inside space-y-1">
+                                                                                    {target.steps.map((s: string, i: number) => (
+                                                                                        <li key={i} className="font-mono text-slate-700">{s}</li>
+                                                                                    ))}
+                                                                                </ol>
+                                                                            )}
+                                                                            {typeof target.target_price === 'number' && (
+                                                                                <div className="mt-2 text-sm font-medium">Target price: <span className="font-mono">{target.target_price.toFixed(2)}</span></div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-slate-500">No target available</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </details>
+                                                    ) : null;
+                                                })()}
                                             </div>
-                                        </div>
+                                        </details>
                                     ))}
                                 </div>
                             )}
                             {/* Fallback single list if grouping absent */}
                             {(!s.strongCharts?.length && !s.weakCharts?.length) && (
                                 s.charts.map((c, idx) => (
-                                    <div key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm">
-                                        <div className="px-4 py-3 border-b flex items-center justify-between">
-                                            <div className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</div>
+                                    <details key={`${c.timeframe}-${idx}`} className="border rounded-xl bg-white shadow-sm" closed>
+                                        <summary className="px-4 py-3 border-b flex items-center justify-between cursor-pointer select-none">
+                                            <span className="text-sm font-medium text-slate-700">Timeframe: {c.timeframe}</span>
                                             <Button type="button" onClick={() => downloadChart(`chart-iframe-${idx}`)} className="text-sm">Download</Button>
-                                        </div>
+                                        </summary>
                                         <div className="p-4">
                                             <HtmlPanel html={c.html} id={`chart-iframe-${idx}`} />
+                                            {/* Explanation details */}
+                                            {c.explanation && (() => {
+                                                const exp = c.explanation;
+                                                const rules = Array.isArray(exp?.rules) ? exp.rules : [];
+                                                const target = exp?.target;
+                                                return (rules.length > 0 || target) ? (
+                                                    <details className="bg-slate-50 border-t mt-4">
+                                                        <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-slate-700 select-none">Details</summary>
+                                                        <div className="px-4 pb-4 pt-1 grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                                                            <div>
+                                                                <div className="font-semibold mb-2">Validation rules</div>
+                                                                <ul className="space-y-1 list-disc list-inside">
+                                                                    {rules.map((rul: any, i: number) => (
+                                                                        <li key={i} className={rul.passed ? 'text-green-700' : 'text-amber-700'}>
+                                                                            {rul.name}: <span className="font-mono">{rul.value}</span> (expected {rul.expected})
+                                                                            {rul.notes ? <span className="text-slate-500"> — {rul.notes}</span> : null}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-semibold mb-2">Target calculation</div>
+                                                                {target ? (
+                                                                    <div>
+                                                                        <div className="text-slate-700 mb-1">{target.formula}</div>
+                                                                        {Array.isArray(target.steps) && target.steps.length > 0 && (
+                                                                            <ol className="list-decimal list-inside space-y-1">
+                                                                                {target.steps.map((s: string, i: number) => (
+                                                                                    <li key={i} className="font-mono text-slate-700">{s}</li>
+                                                                                ))}
+                                                                            </ol>
+                                                                        )}
+                                                                        {typeof target.target_price === 'number' && (
+                                                                            <div className="mt-2 text-sm font-medium">Target price: <span className="font-mono">{target.target_price.toFixed(2)}</span></div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-slate-500">No target available</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </details>
+                                                ) : null;
+                                            })()}
                                         </div>
-                                    </div>
+                                    </details>
                                 ))
                             )}
+                            {/* // )} */}
                         </>
                     )}
                 </div>

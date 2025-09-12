@@ -79,6 +79,7 @@ def get_chart_types():
 @app.get("/modes", response_model=List[str])
 def get_modes():
     return AVAILABLE_MODES
+    return AVAILABLE_MODES
 
 @app.post("/detect")
 def detect_patterns(req: DetectRequest):
@@ -155,7 +156,7 @@ def detect_patterns(req: DetectRequest):
             explanation = (pattern.get('explanation') or {})
             is_valid = bool(validation.get('is_valid')) or str(explanation.get('verdict', '')).lower() in ('valid', 'strong', 'true')
             strength = 'strong' if is_valid else 'weak'
-            chart_item = {"timeframe": timeframe, "html": html_content, "strength": strength}
+            chart_item = {"timeframe": timeframe, "html": html_content, "strength": strength, "explanation": explanation if explanation else None}
             charts.append(chart_item)
             (strong_charts if strength == 'strong' else weak_charts).append(chart_item)
     return JSONResponse(content={"charts": charts, "strong_charts": strong_charts, "weak_charts": weak_charts})
@@ -396,7 +397,7 @@ def _run_detect_all_job(job_id: str, req: DetectAllRequest):
                 symbol=stock,
                 timeframes=['custom'],
                 patterns=list(pattern_map.keys()),
-                mode='lenient',
+                mode=(req.mode or 'lenient'),
                 swing_method='rolling',
                 output_dir='outputs',
                 require_preceding_trend=True,

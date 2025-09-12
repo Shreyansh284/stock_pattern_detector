@@ -25,6 +25,7 @@ class DetectAllRequest(BaseModel):
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
     chart_type: Optional[str] = None  # 'candle' | 'line' | 'ohlc'
+    mode: Optional[str] = None        # 'lenient' | 'strict'
     data_source: Optional[str] = None # 'live' | 'past'
     stock_data_dir: Optional[str] = None
     stock_limit: Optional[int] = None  # optional limit for number of stocks when data_source='past'
