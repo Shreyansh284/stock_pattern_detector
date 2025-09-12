@@ -184,45 +184,6 @@ TIMEFRAMES = {
 # UTILITY FUNCTIONS
 # =============================================================================
 
-def validate_pattern_outcome(data, pattern, lookback_periods=30):
-    """Check if Head & Shoulders pattern actually worked as bearish reversal"""
-    try:
-        breakout_idx = pattern['breakout'][2]
-        if breakout_idx + lookback_periods >= len(data):
-            return True  # Too recent to judge
-        
-        breakout_price = data['Close'].iloc[breakout_idx]
-        future_low = data['Low'].iloc[breakout_idx:breakout_idx + lookback_periods].min()
-        
-        # Pattern should show meaningful decline after breakout
-        decline_pct = (breakout_price - future_low) / breakout_price
-        return decline_pct >= 0.03  # 3% minimum decline
-    except Exception:
-        return True  # If can't validate, don't reject
-
-def check_preceding_trend_improved(data, start_idx, trend_type, lookback=20):
-    """More robust trend detection"""
-    if start_idx < lookback:
-        return False
-    
-    try:
-        start_price = data['Close'].iloc[start_idx - lookback]
-        end_price = data['Close'].iloc[start_idx]
-        
-        if trend_type == 'up':
-            trend_strength = (end_price - start_price) / start_price
-            # Check for consistent movement, not just endpoints
-            mid_price = data['Close'].iloc[start_idx - lookback//2]
-            mid_trend = (mid_price - start_price) / start_price
-            end_trend = (end_price - mid_price) / mid_price
-            
-            # Require both halves show upward movement
-            return trend_strength >= 0.10 and mid_trend > 0 and end_trend > 0
-        
-        return False
-    except Exception:
-        return False
-
 def load_data(symbol, start_date, end_date):
     """Load stock data from yfinance."""
     try:
@@ -611,114 +572,31 @@ def check_preceding_trend(data, pattern_start_index, trend_type='up', lookback_p
 # =============================================================================
 
 def detect_head_and_shoulders(data, config, require_preceding_trend=True):
-    """Detect Head and Shoulders patterns with improved right shoulder detection."""
+    """Detect Head and Shoulders patterns."""
     swing_points_df = data[data.get('is_swing_high', False) | data.get('is_swing_low', False)].reset_index()
     patterns = []
 
     print(f"  🔍 HNS Detection: Found {len(swing_points_df)} swing points")
     
-    # Get all high and low swing points separately for better analysis
-    highs_df = data[data.get('is_swing_high', False)].reset_index()
-    lows_df = data[data.get('is_swing_low', False)].reset_index()
-    
-    if len(highs_df) < 3 or len(lows_df) < 2:
-        return patterns
-    
-    # Iterate through potential head positions (middle high)
-    for head_idx in range(1, len(highs_df) - 1):
-        p2_idx = highs_df.iloc[head_idx]['index']  # Head index
-        p2_high, p2_date = data.loc[p2_idx, ['High', 'Date']]
-        
-        # Find left shoulder - highest peak before head with a trough in between
-        left_shoulder_idx = None
-        left_trough_idx = None
-        
-        for ls_idx in range(head_idx):
-            ls_row = highs_df.iloc[ls_idx]
-            p1_idx = ls_row['index']
-            p1_high = data.loc[p1_idx, 'High']
-            
-            # Find trough between left shoulder and head
-            trough_candidates = lows_df[(lows_df['index'] > p1_idx) & (lows_df['index'] < p2_idx)]
-            if len(trough_candidates) > 0:
-                # Take the lowest trough between shoulder and head
-                t1_idx = trough_candidates.loc[trough_candidates['Low'].idxmin(), 'index']
-                left_shoulder_idx = p1_idx
-                left_trough_idx = t1_idx
-                break
-        
-        if left_shoulder_idx is None or left_trough_idx is None:
-            continue
-            
-        # Find right shoulder - look for the HIGHEST peak after head in the right shoulder region
-        right_shoulder_idx = None
-        right_trough_idx = None
-        
-        # First find the trough after head
-        right_trough_candidates = lows_df[lows_df['index'] > p2_idx]
-        if len(right_trough_candidates) == 0:
-            continue
-            
-        # Take the first significant trough after head
-        t2_idx = right_trough_candidates.iloc[0]['index']
-        
-        # Now look for the HIGHEST peak in the right shoulder region (after the trough)
-        right_shoulder_candidates = highs_df[highs_df['index'] > t2_idx]
-        
-        # Look within a reasonable distance to maintain pattern symmetry
-        head_to_trough_distance = p2_idx - t1_idx
-        max_distance = min(len(data), t2_idx + int(head_to_trough_distance * 1.5))  # Proportional to left side
-        right_shoulder_candidates = right_shoulder_candidates[right_shoulder_candidates['index'] <= max_distance]
-        
-        if len(right_shoulder_candidates) == 0:
-            continue
-            
-        # Find FIRST reasonable peak in right shoulder region (natural pattern flow)
-        # Don't take highest - take first that matches shoulder characteristics
-        best_rs_idx = None
-        head_to_left_trough_distance = p2_idx - t1_idx
-        p1_high_val = data.loc[left_shoulder_idx, 'High']
-        
-        for _, candidate in right_shoulder_candidates.iterrows():
-            rs_idx = candidate['index']
-            rs_high = candidate['High']
-            
-            # Distance constraint - should be reasonable timing
-            distance_from_trough = rs_idx - t2_idx
-            reasonable_distance = distance_from_trough <= head_to_left_trough_distance * 1.3
-            
-            # Height constraint - within 30% of left shoulder (natural symmetry)
-            height_ratio = rs_high / p1_high_val
-            reasonable_height = 0.7 <= height_ratio <= 1.3
-            
-            # Take FIRST reasonable candidate, not highest
-            if reasonable_distance and reasonable_height:
-                best_rs_idx = rs_idx
-                break  # Take first reasonable match - this is key!
-        
-        if best_rs_idx is None:
-            continue
-            
-        highest_right_peak_idx = best_rs_idx
-        
-        p3_idx = highest_right_peak_idx
-        right_shoulder_idx = p3_idx
-        right_trough_idx = t2_idx
+    for i in range(len(swing_points_df) - 4):
+        # Get indices of the 5 swing points
+        p1_idx, t1_idx, p2_idx, t2_idx, p3_idx = swing_points_df['index'][i:i+5]
 
-        # Now we have our 5 points, validate the pattern
-        p1_idx, t1_idx, p2_idx, t2_idx, p3_idx = left_shoulder_idx, left_trough_idx, p2_idx, right_trough_idx, right_shoulder_idx
+        # Ensure correct sequence (High, Low, High, Low, High)
+        if not (data['is_swing_high'][p1_idx] and data['is_swing_low'][t1_idx] and
+                data['is_swing_high'][p2_idx] and data['is_swing_low'][t2_idx] and
+                data['is_swing_high'][p3_idx]):
+            continue
 
         # Get prices and dates
         p1_high, p1_date = data.loc[p1_idx, ['High', 'Date']]
         t1_low, t1_date = data.loc[t1_idx, ['Low', 'Date']]
-        # p2_high, p2_date already defined above
+        p2_high, p2_date = data.loc[p2_idx, ['High', 'Date']]
         t2_low, t2_date = data.loc[t2_idx, ['Low', 'Date']]
         p3_high, p3_date = data.loc[p3_idx, ['High', 'Date']]
-        
-        print(f"    📍 HNS Candidate: LS:{p1_high:.2f}@{p1_date.strftime('%Y-%m-%d')}, Head:{p2_high:.2f}@{p2_date.strftime('%Y-%m-%d')}, RS:{p3_high:.2f}@{p3_date.strftime('%Y-%m-%d')}")
 
-        # Check preceding uptrend - use improved validation
-        if require_preceding_trend and not check_preceding_trend_improved(data, left_shoulder_idx, 'up'):
+        # Check preceding uptrend
+        if require_preceding_trend and not check_preceding_trend(data, p1_idx, 'up'):
             print(f"    HNS Rejected: No preceding uptrend")
             continue
 
@@ -730,12 +608,13 @@ def detect_head_and_shoulders(data, config, require_preceding_trend=True):
             print(f"    HNS Rejected: Head not highest (Head: {p2_high:.2f}, Shoulders: {p1_high:.2f}, {p3_high:.2f})")
             continue
         
-        # Second check: Head prominence (maintain minimum quality standards)
+        # Second check: Head prominence (more lenient)
         head_prominence = (p2_high - higher_shoulder) / higher_shoulder
         min_prominence = config['HEAD_OVER_SHOULDER_PCT']
         
-        # Maintain minimum quality - even in lenient mode, require meaningful prominence
-        min_prominence = max(config.get('HEAD_OVER_SHOULDER_PCT', 0.05), 0.02)  # Minimum 2%
+        # Make prominence requirement more lenient in lenient mode
+        if 'lenient' in str(config).lower() or config.get('HEAD_OVER_SHOULDER_PCT', 0) <= 0.05:
+            min_prominence = 0.005  # Just 0.5% prominence in lenient mode
         
         if head_prominence < min_prominence:
             print(f"    HNS Rejected: Head prominence {head_prominence:.1%} < required {min_prominence:.1%}")
@@ -784,7 +663,7 @@ def detect_head_and_shoulders(data, config, require_preceding_trend=True):
             print(f"    HNS Warning: Volume analysis failed, proceeding without volume validation")
             volume_ok = False
 
-        # Look for neckline breakout - Require sustained breakout (not single bar)
+        # Look for neckline breakout - Allow patterns without confirmed breakout
         breakout_confirmed = False
         breakout_idx = -1
         
@@ -792,30 +671,24 @@ def detect_head_and_shoulders(data, config, require_preceding_trend=True):
         pattern_end_idx = p3_idx
         is_recent_pattern = (len(data) - pattern_end_idx) <= 30  # Pattern within last 30 bars
         
-        # Require sustained breakout - at least 2 consecutive closes below neckline
-        consecutive_closes_below = 0
         for j in range(p3_idx + 1, min(len(data), p3_idx + 90)):
             date_j = data['Date'].iloc[j]
             neckline_price_at_j = slope * date_j.toordinal() + intercept
             close_j = data['Close'].iloc[j]
             
             if close_j < neckline_price_at_j:
-                consecutive_closes_below += 1
-                if consecutive_closes_below >= 2:  # At least 2 consecutive closes
-                    try:
-                        avg_volume_pattern = float(data.iloc[p1_idx:p3_idx+1]['Volume'].mean())
-                        vol_j = float(data['Volume'].iloc[j])
-                        if vol_j > avg_volume_pattern * config['VOLUME_SPIKE_MULT']:
-                            breakout_confirmed = True
-                            breakout_idx = j
-                            break
-                    except Exception:
-                        # Accept sustained breakout even without volume confirmation
+                try:
+                    avg_volume_pattern = float(data.iloc[p1_idx:p3_idx+1]['Volume'].mean())
+                    vol_j = float(data['Volume'].iloc[j])
+                    if vol_j > avg_volume_pattern * config['VOLUME_SPIKE_MULT']:
                         breakout_confirmed = True
                         breakout_idx = j
                         break
-            else:
-                consecutive_closes_below = 0  # Reset counter
+                except Exception:
+                    # Accept breakout even without volume confirmation
+                    breakout_confirmed = True
+                    breakout_idx = j
+                    break
 
         # Accept pattern if breakout confirmed OR if it's a recent pattern still forming
         if breakout_confirmed or is_recent_pattern:
@@ -840,14 +713,6 @@ def detect_head_and_shoulders(data, config, require_preceding_trend=True):
                 'breakout_confirmed': breakout_confirmed,
                 'is_forming': is_recent_pattern and not breakout_confirmed
             }
-            
-            # Validate pattern outcome - did it actually work as expected?
-            if breakout_confirmed:
-                pattern_worked = validate_pattern_outcome(data, pattern_data)
-                if not pattern_worked:
-                    print(f"    HNS Rejected: Pattern didn't work as expected - no meaningful decline after breakout")
-                    continue
-            
             patterns.append(pattern_data)
             print(f"    ✅ HNS Pattern detected! Duration: {(p3_date - p1_date).days} days, Breakout: {breakout_confirmed}")
         else:

@@ -63,12 +63,12 @@ def validate_hns(df, pattern):
     
     # Set adaptive thresholds based on mode
     if validation_mode == 'lenient':
-        head_prominence_req = 0.02      # 2% instead of 8% (stricter lenient)
-        shoulder_similarity_req = 0.20   # 20% instead of 15% (more flexible)
+        head_prominence_req = 0.03      # 3% instead of 8%
+        shoulder_similarity_req = 0.15   # 15% instead of 12%
         time_symmetry_req = 0.50        # 50% instead of 35%
         neckline_angle_req = 45.0       # 45° instead of 20°
         breakout_timing_max = 30        # 30 periods instead of 20
-        volume_spike_req = 1.2          # 1.2x instead of 1.3x (more flexible)
+        volume_spike_req = 1.3          # 1.3x instead of 1.5x
         min_score_req = 4               # 4/6 instead of 5/6
     else:  # strict mode
         head_prominence_req = 0.08      # 8%
@@ -240,8 +240,7 @@ def validate_hns(df, pattern):
                 'passed': is_decisive and 10 <= breakout_timing <= breakout_timing_max
             }
             
-            # Accept breakout timing between 1-30 periods (more flexible)
-            if is_decisive and 1 <= breakout_timing <= 30:
+            if is_decisive and 10 <= breakout_timing <= breakout_timing_max:
                 score += 1
                 breakout_confirmed = True
                 print(f"    ✅ Breakout confirmed: {breakout_margin:.1%} below neckline in {breakout_timing} periods")
@@ -249,7 +248,7 @@ def validate_hns(df, pattern):
                 if not is_decisive:
                     rejection_reasons.append(f"Breakout not decisive - only {breakout_margin:.1%} below neckline")
                 else:
-                    rejection_reasons.append(f"Breakout timing {breakout_timing} periods outside 1-30 range")
+                    rejection_reasons.append(f"Breakout timing {breakout_timing} periods outside 10-{breakout_timing_max} range")
                 print(f"    ❌ Breakout confirmation failed")
         else:
             rejection_reasons.append("No breakout detected or neckline calculation failed")
@@ -303,9 +302,9 @@ def validate_hns(df, pattern):
     
     # Additional validation: Pattern duration - adaptive based on mode
     if validation_mode == 'lenient':
-        duration_min, duration_max = 20, 200  # 20 days to 200 days - more realistic
+        duration_min, duration_max = 30, 365  # Up to 1 year for realistic patterns
     else:  # strict mode
-        duration_min, duration_max = 30, 120  # 30-120 days for strict
+        duration_min, duration_max = 30, 90   # Textbook 30-90 days
     
     duration_valid = duration_min <= pattern_duration <= duration_max
     detailed_scores['pattern_duration'] = {
